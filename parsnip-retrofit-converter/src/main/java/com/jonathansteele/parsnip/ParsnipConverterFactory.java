@@ -36,7 +36,7 @@ public class ParsnipConverterFactory extends Converter.Factory {
     private final Parsnip parsnip;
 
     private ParsnipConverterFactory(Parsnip parsnip) {
-        if (parsnip == null) throw new NullPointerException("xml == null");
+        if (parsnip == null) throw new NullPointerException("parsnip == null");
         this.parsnip = parsnip;
     }
 
