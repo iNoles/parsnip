@@ -16,6 +16,7 @@
 
 package com.jonathansteele.parsnip;
 
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
@@ -24,7 +25,7 @@ import okio.Buffer;
 import okio.BufferedSource;
 import okio.ByteString;
 
-public class XmlReader {
+public class XmlReader implements Closeable {
     private static final ByteString TAG_START_TERMINALS = ByteString.encodeUtf8(">/ \n\t\r\f");
     private static final ByteString TEXT_END_TERMINAL = ByteString.encodeUtf8("&<");
     private static final ByteString ATTRIBUTE_END_TERMINAL = ByteString.encodeUtf8("= ");
@@ -376,7 +377,7 @@ public class XmlReader {
             case PEEKED_EOF:
                 return Token.END_DOCUMENT;
             default:
-                throw new AssertionError();
+                throw new AssertionError("Unknown Token: Peeked =" + p);
         }
     }
 
@@ -964,6 +965,15 @@ public class XmlReader {
      */
     private IOException syntaxError(String message) throws IOException {
         throw new IOException(message + " at path " + getPath());
+    }
+
+    @Override
+    public void close() throws IOException {
+        peeked = PEEKED_NONE;
+        stackSize = 1;
+        nextStringBuffer.clear();
+        buffer.clear();
+        source.close();
     }
 
     public enum Token {

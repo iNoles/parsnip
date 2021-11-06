@@ -13,26 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.jonathansteele.parsnip
 
-package com.jonathansteele.parsnip;
+import okhttp3.ResponseBody
+import retrofit2.Converter
+import kotlin.Throws
+import java.io.IOException
 
-import okhttp3.ResponseBody;
-import okio.BufferedSource;
-import retrofit2.Converter;
-
-import java.io.IOException;
-
-public class ParsnipResponseBodyConverter<T> implements Converter<ResponseBody, T> {
-    private final XmlAdapter<T> adapter;
-
-    public ParsnipResponseBodyConverter(XmlAdapter<T> adapter) {
-        this.adapter = adapter;
-    }
-
-    @Override
-    public T convert(ResponseBody value) throws IOException {
-        try (BufferedSource source = value.source()) {
-            return adapter.fromXml(source);
-        }
+class ParsnipResponseBodyConverter<T>(private val adapter: XmlAdapter<T>) : Converter<ResponseBody, T> {
+    @Throws(IOException::class)
+    override fun convert(value: ResponseBody): T {
+        value.source().use { source -> return adapter.fromXml(source) }
     }
 }

@@ -1,7 +1,15 @@
-group = "com.jonathansteele.parsnip"
-version = "1.0-SNAPSHOT"
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.vanniktech:gradle-maven-publish-plugin:0.18.0")
+    }
+}
 
 subprojects {
+    apply(plugin = "com.vanniktech.maven.publish")
+
     repositories {
         mavenCentral()
     }

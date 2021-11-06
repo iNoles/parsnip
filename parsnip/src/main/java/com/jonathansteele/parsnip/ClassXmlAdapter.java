@@ -55,10 +55,10 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
             }
 
             ClassFactory<Object> classFactory = ClassFactory.get(rawType);
-            ArrayList<AttributeFieldBinding> attributes = new ArrayList<>();
-            ArrayList<TagFieldBinding> tags = new ArrayList<>();
+            ArrayList<AttributeFieldBinding<?>> attributes = new ArrayList<>();
+            ArrayList<TagFieldBinding<?>> tags = new ArrayList<>();
             // Only a single text, but this makes it easier to check for duplicates
-            ArrayList<TextFieldBinding> text = new ArrayList<>(1);
+            ArrayList<TextFieldBinding<?>> text = new ArrayList<>(1);
             for (Type t = type; t != Object.class; t = Types.getGenericSuperclass(t)) {
                 createFieldBindings(adapters, t, attributes, tags, text);
             }
@@ -66,7 +66,12 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         }
 
         /** Creates a field binding for each of declared field of {@code type}. */
-        private void createFieldBindings(XmlAdapters adapters, Type type, ArrayList<AttributeFieldBinding> attributes, ArrayList<TagFieldBinding> tags, ArrayList<TextFieldBinding> text) {
+        private void createFieldBindings(
+                XmlAdapters adapters, Type type,
+                ArrayList<AttributeFieldBinding<?>> attributes,
+                ArrayList<TagFieldBinding<?>> tags,
+                ArrayList<TextFieldBinding<?>> text
+        ) {
             Class<?> rawType = Types.getRawType(type);
             boolean platformType = isPlatformType(rawType);
             for (Field field : rawType.getDeclaredFields()) {
@@ -100,7 +105,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                         }
                         TextFieldBinding<?> fieldBinding = new TextFieldBinding<>(field, converter);
                         if (!text.isEmpty()) {
-                            FieldBinding replaced = tags.get(0);
+                            FieldBinding<?> replaced = tags.get(0);
                             throw new IllegalArgumentException("Text annotation collision: @Text is on both '"
                                     + field.getName() + "' and '" + replaced.field.getName() + "'.");
                         }
@@ -111,7 +116,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                         Namespace namespace = getNamespace(field);
                         if (adapter != null) {
                             TagFieldBinding<?> fieldBinding = new TagFieldBinding<>(field, name, namespace, adapter);
-                            FieldBinding replaced = getFieldBindingTags(tags, name, namespace);
+                            FieldBinding<?> replaced = getFieldBindingTags(tags, name, namespace);
                             // Store it using the field's name. If there was already a field with this name, fail!
                             if (replaced != null) {
                                 throw new IllegalArgumentException("Field name collision: '" + field.getName() + "'"
@@ -125,7 +130,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                                 throw new IllegalArgumentException("No XmlAdapter or TypeConverter for type " + fieldType + " and annotations " + annotations);
                             }
                             AttributeFieldBinding<?> fieldBinding = new AttributeFieldBinding<>(field, name, namespace, converter);
-                            FieldBinding replaced = getFieldBindingAttributes(attributes, name, namespace);
+                            FieldBinding<?> replaced = getFieldBindingAttributes(attributes, name, namespace);
                             // Store it using the field's name. If there was already a field with this name, fail!
                             if (replaced != null) {
                                 throw new IllegalArgumentException("Field name collision: '" + field.getName() + "'"
@@ -198,13 +203,18 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
     };
 
     private final ClassFactory<T> classFactory;
-    private final ArrayList<AttributeFieldBinding> attributes;
-    private final ArrayList<TagFieldBinding> tags;
-    private final TextFieldBinding text;
+    private final ArrayList<AttributeFieldBinding<?>> attributes;
+    private final ArrayList<TagFieldBinding<?>> tags;
+    private final TextFieldBinding<?> text;
     // Namespaces to declare when writing.
     private LinkedHashSet<Namespace> declareNamespaces;
 
-    private ClassXmlAdapter(ClassFactory<T> classFactory, ArrayList<AttributeFieldBinding> attributes, ArrayList<TagFieldBinding> tags, TextFieldBinding text) {
+    private ClassXmlAdapter(
+            ClassFactory<T> classFactory,
+            ArrayList<AttributeFieldBinding<?>> attributes,
+            ArrayList<TagFieldBinding<?>> tags,
+            TextFieldBinding<?> text
+    ) {
         this.classFactory = classFactory;
         this.attributes = attributes;
         this.tags = tags;
@@ -213,13 +223,13 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
 
     private LinkedHashSet<Namespace> initDeclareNamespaces() {
         LinkedHashSet<Namespace> declareNamespaces = new LinkedHashSet<>();
-        for (AttributeFieldBinding attribute : attributes) {
+        for (AttributeFieldBinding<?> attribute : attributes) {
             Namespace namespace = attribute.namespace;
             if (namespace != null) {
                 declareNamespaces.add(namespace);
             }
         }
-        for (TagFieldBinding tag : tags) {
+        for (TagFieldBinding<?> tag : tags) {
             Namespace namespace = tag.namespace;
             if (namespace != null) {
                 declareNamespaces.add(namespace);
@@ -246,9 +256,9 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         }
 
         try {
-            for (TagFieldBinding fieldBinding : tags) {
+            for (TagFieldBinding<?> fieldBinding : tags) {
                 if (fieldBinding instanceof CollectionFieldBinding) {
-                    ((CollectionFieldBinding) fieldBinding).init(result);
+                    ((CollectionFieldBinding<?>) fieldBinding).init(result);
                 }
             }
         } catch (IllegalAccessException e) {
@@ -262,7 +272,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                 switch (token) {
                     case ATTRIBUTE: {
                         String name = reader.nextAttribute(namespace);
-                        FieldBinding fieldBinding = getFieldBindingAttributes(attributes, name, namespace);
+                        FieldBinding<?> fieldBinding = getFieldBindingAttributes(attributes, name, namespace);
                         if (fieldBinding != null) {
                             fieldBinding.read(reader, result);
                         } else {
@@ -271,7 +281,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                         break;
                     }
                     case TEXT: {
-                        FieldBinding fieldBinding = text;
+                        FieldBinding<?> fieldBinding = text;
                         if (fieldBinding != null) {
                             fieldBinding.read(reader, result);
                         } else {
@@ -281,7 +291,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                     }
                     case BEGIN_TAG: {
                         String name = reader.beginTag(namespace);
-                        FieldBinding fieldBinding = getFieldBindingTags(tags, name, namespace);
+                        FieldBinding<?> fieldBinding = getFieldBindingTags(tags, name, namespace);
                         if (fieldBinding != null) {
                             fieldBinding.read(reader, result);
                         } else {
@@ -315,10 +325,10 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         
         try {
             // Write actual stuff
-            for (FieldBinding fieldBinding : attributes) {
+            for (FieldBinding<?> fieldBinding : attributes) {
                 fieldBinding.write(writer, value);
             }
-            for (FieldBinding fieldBinding : tags) {
+            for (FieldBinding<?> fieldBinding : tags) {
                 fieldBinding.write(writer, value);
             }
             if (text != null) {
@@ -329,8 +339,12 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         }
     }
 
-    private static FieldBinding getFieldBindingTags(ArrayList<? extends TagFieldBinding> fields, String name, Namespace namespace) {
-        for (TagFieldBinding fieldBinding : fields) {
+    private static FieldBinding<?> getFieldBindingTags(
+            ArrayList<? extends TagFieldBinding<?>> fields,
+            String name,
+            Namespace namespace
+    ) {
+        for (TagFieldBinding<?> fieldBinding : fields) {
             if (fieldBinding.name.equals(name) && nsEquals(fieldBinding.namespace, namespace)) {
                 return fieldBinding;
             }
@@ -338,8 +352,12 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         return null;
     }
 
-    private static FieldBinding getFieldBindingAttributes(ArrayList<? extends AttributeFieldBinding> fields, String name, Namespace namespace) {
-        for (AttributeFieldBinding fieldBinding : fields) {
+    private static FieldBinding<?> getFieldBindingAttributes(
+            ArrayList<? extends AttributeFieldBinding<?>> fields,
+            String name,
+            Namespace namespace
+    ) {
+        for (AttributeFieldBinding<?> fieldBinding : fields) {
             if (fieldBinding.name.equals(name) && nsEquals(fieldBinding.namespace, namespace)) {
                 return fieldBinding;
             }

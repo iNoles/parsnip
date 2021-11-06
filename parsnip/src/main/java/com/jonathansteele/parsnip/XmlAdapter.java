@@ -24,6 +24,7 @@ import java.util.Set;
 import okio.Buffer;
 import okio.BufferedSink;
 import okio.BufferedSource;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class XmlAdapter<T> {
     public abstract T fromXml(XmlReader reader) throws IOException;
@@ -36,13 +37,13 @@ public abstract class XmlAdapter<T> {
         return fromXml(new Buffer().writeUtf8(string));
     }
 
-    public abstract void toXml(XmlWriter writer, T value) throws IOException;
+    public abstract void toXml(XmlWriter writer, @Nullable T value) throws IOException;
 
-    public final void toXml(BufferedSink sink, T value) throws IOException {
+    public final void toXml(BufferedSink sink, @Nullable T value) throws IOException {
         toXml(new XmlWriter(sink), value);
     }
 
-    public final String toXml(T value) {
+    public final String toXml(@Nullable T value) {
         Buffer buffer = new Buffer();
         try {
             toXml(buffer, value);

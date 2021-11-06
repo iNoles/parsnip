@@ -15,6 +15,8 @@
  */
 package com.jonathansteele.parsnip;
 
+import com.jonathansteele.parsnip.annotations.XmlClass;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.GenericDeclaration;
@@ -35,6 +37,17 @@ final class Types {
     static final Type[] EMPTY_TYPE_ARRAY = new Type[]{};
 
     private Types() {
+    }
+
+    public static String generatedXmlAdapterName(Class<?> clazz) {
+        if (clazz.getAnnotation(XmlClass.class) == null) {
+            throw new IllegalArgumentException("Class does not have a XmlClass annotation: " + clazz);
+        }
+        return generatedXmlAdapterName(clazz.getName());
+    }
+
+    public static String generatedXmlAdapterName(String className) {
+        return className.replace("$", "_") + "XmlAdapter";
     }
 
     /**

@@ -10,13 +10,13 @@ import java.util.Date
  * formatted like {@code 2015-09-26T18:23:50.250Z}.
  */
 class Rfc3339DateJsonAdapter : XmlAdapter<Date>() {
-    override fun fromXml(reader: XmlReader?): Date {
-        val string: String = reader?.nextText()!!
+    override fun fromXml(reader: XmlReader): Date {
+        val string: String = reader.nextText()
         return Iso8601Utils.parse(string)
     }
 
-    override fun toXml(writer: XmlWriter?, value: Date?) {
+    override fun toXml(writer: XmlWriter, value: Date?) {
         val string = Iso8601Utils.format(value)
-        writer?.value(string)
+        writer.value(string)
     }
 }

@@ -9,10 +9,11 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-Added            <option value="$PROJECT_DIR$/adapters" />
+            <option value="$PROJECT_DIR$/adapters" />
             <option value="$PROJECT_DIR$/benchmark" />
+            <option value="$PROJECT_DIR$/kotlin-codegen" />
             <option value="$PROJECT_DIR$/parsnip" />
-            <option value="$PROJECT_DIR$/parsnip-retrofit-converter" />
+            <option value="$PROJECT_DIR$/retrofit-converter" />
           </set>
         </option>
       </GradleProjectSettings>
