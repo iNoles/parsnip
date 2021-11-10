@@ -43,7 +43,7 @@ final class XmlScope {
     static final int ELEMENT_ATTRIBUTE = 4;
 
     /**
-     * We are in an elment's content (between opening and closing xml element tag) like {@code
+     * We are in an element's content (between opening and closing xml element tag) like {@code
      * <element>HERE WE ARE</element>}
      */
     static final int ELEMENT_CONTENT = 5;
@@ -60,7 +60,7 @@ final class XmlScope {
      * @param stack The stack itself
      * @return String representing the XmlScope on top of the stack
      */
-    static String getTopStackElementAsToken(int stackSize, int stack[]) throws IOException {
+    static String getTopStackElementAsToken(int stackSize, int[] stack) throws IOException {
         switch (stack[stackSize - 1]) {
             case ELEMENT_OPENING:
                 return "ELEMENT_OPENING";
@@ -89,7 +89,7 @@ final class XmlScope {
      */
     static String getPath(int stackSize, int[] stack, String[] pathNames, int[] pathIndices) {
         StringBuilder result = new StringBuilder();
-        for (int i = 0, size = stackSize; i < size; i++) {
+        for (int i = 0; i < stackSize; i++) {
             switch (stack[i]) {
                 case ELEMENT_OPENING:
                     result.append('/');
