@@ -271,7 +271,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
             while (token != XmlReader.Token.END_TAG) {
                 switch (token) {
                     case ATTRIBUTE: {
-                        String name = reader.nextAttribute(namespace);
+                        String name = reader.nextAttribute();
                         FieldBinding<?> fieldBinding = getFieldBindingAttributes(attributes, name, namespace);
                         if (fieldBinding != null) {
                             fieldBinding.read(reader, result);
@@ -290,12 +290,13 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                         break;
                     }
                     case BEGIN_TAG: {
-                        String name = reader.beginTag(namespace);
+                        reader.beginTag();
+                        String name = reader.nextTagName();
                         FieldBinding<?> fieldBinding = getFieldBindingTags(tags, name, namespace);
                         if (fieldBinding != null) {
                             fieldBinding.read(reader, result);
                         } else {
-                            reader.skipTag();
+                            reader.skip();
                         }
                         break;
                     }

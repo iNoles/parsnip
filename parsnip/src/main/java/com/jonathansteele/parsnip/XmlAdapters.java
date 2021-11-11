@@ -154,7 +154,8 @@ public class XmlAdapters {
 
         @Override
         public T fromXml(XmlReader reader) throws IOException {
-            String name = reader.beginTag();
+            reader.beginTag();
+            String name = reader.nextTagName();
             if (!this.name.equals(name)) {
                 throw new XmlDataException("Invalid root tag. Expected " + this.name + " but got " + name);
             }
