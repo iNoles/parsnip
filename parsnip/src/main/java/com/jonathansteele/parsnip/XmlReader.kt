@@ -15,9 +15,6 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     private var pathNames = arrayOfNulls<String>(32)
     private var pathIndices = IntArray(32)
 
-    /*
-     * The nesting stack. Using a manual array rather than an ArrayList saves 20%.
-     */
     private var stack = IntArray(32)
     private var stackSize = 0
     private val buffer: Buffer = source.buffer
@@ -283,7 +280,8 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     /**
-     * Skip the value of an attribute if you don't want to read the value. [ ][.nextAttribute] must be called before invoking this method
+     * Skip the value of an attribute if you don't want to read the value.
+     * [.nextAttributeName] must be called before invoking this method
      */
     private fun skipAttributeValue() {
         var p = peeked
@@ -688,9 +686,11 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     /**
-     * This method skips the rest of an xml Element. This method is typically invoked once [ ][.beginTag] ang [.nextTagName] has been consumed, but we don't want to consume
-     * the xml element with the given name. So with this method we can  skip the whole remaining xml
-     * element (attribute, text content and child elements) by using this method.
+     * This method skips the rest of an xml Element.
+     * This method is typically invoked once [.beginTag] ang [.nextTagName] has been consumed,
+     * but we don't want to consume the xml element with the given name.
+     * So with this method we can skip the whole remaining xml element (attribute, text content and child elements)
+     * by using this method.
      */
     fun skip() {
         val stackPeek = stack[stackSize - 1]
@@ -720,12 +720,6 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         } while (count != 0)
     }
 
-    /**
-     * Skip an unquoted value
-     *
-     * private void skipUnquotedValue() throws IOException { long i = source.indexOfElement(UNQUOTED_STRING_TERMINALS);
-     * buffer.skip(i != -1L ? i : buffer.size()); }
-     */
     enum class Token {
         /**
          * Indicates that an xml element begins.
