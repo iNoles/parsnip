@@ -1,306 +1,219 @@
-package com.jonathansteele.parsnip;
+package com.jonathansteele.parsnip
 
-import okio.Buffer;
-import okio.BufferedSource;
-import okio.ByteString;
-
-import java.io.Closeable;
-import java.io.EOFException;
-import java.io.IOException;
+import okio.Buffer
+import okio.BufferedSource
+import okio.ByteString
+import okio.ByteString.Companion.encodeUtf8
+import java.io.Closeable
+import java.io.EOFException
+import java.io.IOException
 
 //TODO: Namespace Support
-public class XmlReader implements Closeable {
-    private static final ByteString UNQUOTED_STRING_TERMINALS = ByteString.encodeUtf8(" >/=\n");
-
-    private static final ByteString CDATA_CLOSE = ByteString.encodeUtf8("]]>");
-    private static final ByteString CDATA_OPEN = ByteString.encodeUtf8("<![CDATA[");
-    private static final ByteString DOCTYPE_OPEN = ByteString.encodeUtf8("<!DOCTYPE");
-    private static final ByteString COMMENT_CLOSE = ByteString.encodeUtf8("-->");
-    private static final ByteString XML_DECLARATION_CLOSE = ByteString.encodeUtf8("?>");
-    private static final ByteString UTF8_BOM = ByteString.of((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
-
-    private static final byte DOUBLE_QUOTE = '"';
-    private static final byte SINGLE_QUOTE = '\'';
-    private static final byte OPENING_XML_ELEMENT = '<';
-    private static final byte CLOSING_XML_ELEMENT = '>';
-    private static final byte OPENING_DOCTYPE_BRACKET = '[';
-    private static final byte CLOSING_DOCTYPE_BRACKET = ']';
-
-    //
-    // Peek states
-    //
-    /** Nothing peeked */
-    private static final int PEEKED_NONE = 0;
-    /** Peeked an xml element / object */
-    private static final int PEEKED_BEGIN_TAG = 1;
-    /** Peeked the closing xml tag which indicates the end of an object */
-    private static final int PEEKED_END_TAG = 2;
-    /** Peeked the closing xml header tag, hence we are inner xml tag object body */
-    private static final int PEEKED_TEXT = 3;
-    /** Peeked the end of the stream */
-    private static final int PEEKED_EOF = 4;
-    /** Peeked an unquoted value which can be either xml element name or element attribute name */
-    private static final int PEEKED_ELEMENT_NAME = 5;
-    /** Peeked a quoted value which is the value of an xml attribute */
-    private static final int PEEKED_DOUBLE_QUOTED = 6;
-    /** Peeked a single quote which is the value of an xml attribute */
-    private static final int PEEKED_SINGLE_QUOTED = 7;
-    /** Peeked an attribute name (of a xml element) */
-    private static final int PEEKED_ATTRIBUTE_NAME = 8;
-
-    /** Peeked a CDATA */
-    private static final int PEEKED_CDATA = 9;
-
-    /** The input XML. */
-    private int peeked = PEEKED_NONE;
-
-    private String[] pathNames = new String[32];
-    private int[] pathIndices = new int[32];
+class XmlReader internal constructor(private val source: BufferedSource) : Closeable {
+    /** The input XML.  */
+    private var peeked = PEEKED_NONE
+    private var pathNames = arrayOfNulls<String>(32)
+    private var pathIndices = IntArray(32)
 
     /*
      * The nesting stack. Using a manual array rather than an ArrayList saves 20%.
      */
-    private int[] stack = new int[32];
-    private int stackSize = 0;
+    private var stack = IntArray(32)
+    private var stackSize = 0
+    private val buffer: Buffer = source.buffer
+    private var currentTagName: String? = null
 
-    {
-        stack[stackSize++] = XmlScope.EMPTY_DOCUMENT;
-    }
-
-    private final BufferedSource source;
-    private final Buffer buffer;
-    private String currentTagName;
-
-    XmlReader(BufferedSource source) {
-        if (source == null) {
-            throw new NullPointerException("source == null");
-        }
-        this.source = source;
-        this.buffer = source.getBuffer();
+    init {
+        stack[stackSize++] = XmlScope.EMPTY_DOCUMENT
     }
 
     /**
      * Get the next token without consuming it.
      *
-     * @return {@link Token}
+     * @return [Token]
      */
-    public Token peek() throws IOException {
-        int p = peeked;
+    fun peek(): Token {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
-
-        switch (p) {
-            case PEEKED_BEGIN_TAG:
-                return Token.BEGIN_TAG;
-
-            case PEEKED_ELEMENT_NAME:
-                return Token.ELEMENT_NAME;
-
-            case PEEKED_END_TAG:
-                return Token.END_TAG;
-
-            case PEEKED_ATTRIBUTE_NAME:
-                return Token.ATTRIBUTE;
-
-            case PEEKED_DOUBLE_QUOTED:
-            case PEEKED_SINGLE_QUOTED:
-                return Token.VALUE;
-
-            case PEEKED_TEXT:
-            case PEEKED_CDATA:
-                return Token.TEXT;
-
-            case PEEKED_EOF:
-                return Token.END_DOCUMENT;
-            default:
-                throw new AssertionError("Unknown XmlToken: Peeked = " + p);
+        return when (p) {
+            PEEKED_BEGIN_TAG -> Token.BEGIN_TAG
+            PEEKED_ELEMENT_NAME -> Token.ELEMENT_NAME
+            PEEKED_END_TAG -> Token.END_TAG
+            PEEKED_ATTRIBUTE_NAME -> Token.ATTRIBUTE
+            PEEKED_DOUBLE_QUOTED, PEEKED_SINGLE_QUOTED -> Token.VALUE
+            PEEKED_TEXT, PEEKED_CDATA -> Token.TEXT
+            PEEKED_EOF -> Token.END_DOCUMENT
+            else -> throw AssertionError("Unknown Token: Peeked = $p")
         }
     }
 
     /**
      * Actually do a peek. This method will return the peeked token and updates the internal variable
-     * {@link #peeked}
+     * [.peeked]
      *
      * @return The peeked token
      */
-    private int doPeek() throws IOException {
-        int peekStack = stack[stackSize - 1];
+    private fun doPeek(): Int {
+        val peekStack = stack[stackSize - 1]
         if (peekStack == XmlScope.ELEMENT_OPENING) {
-            int c = nextNonWhitespace(true);
-            if (isLiteral((char) c)) {
-                return peeked = PEEKED_ELEMENT_NAME;
+            val c = nextNonWhitespace(true)
+            return if (isLiteral(c.toChar().code)) {
+                PEEKED_ELEMENT_NAME.also { peeked = it }
             } else {
-                throw syntaxError("Expected xml element name (literal expected)");
+                throw syntaxError("Expected xml element name (literal expected)")
             }
         } else if (peekStack == XmlScope.ELEMENT_ATTRIBUTE) {
-            int c = nextNonWhitespace(true);
-
+            var c = nextNonWhitespace(true)
             if (isLiteral(c)) {
-                return peeked = PEEKED_ATTRIBUTE_NAME;
+                return PEEKED_ATTRIBUTE_NAME.also { peeked = it }
             }
-
-            switch (c) {
-                case '>':
+            when (c.toChar()) {
+                '>' -> {
                     // remove XmlScope.ELEMENT_ATTRIBUTE from top of the stack
-                    popStack();
+                    popStack()
 
                     // set previous stack from XmlScope.ELEMENT_OPENING to XmlScope.ELEMENT_CONTENT
-                    stack[stackSize - 1] = XmlScope.ELEMENT_CONTENT;
-                    buffer.readByte(); // consume '>'
-
-                    int nextChar = nextNonWhitespace(true);
-
-                    if (nextChar != '<') {
-                        return peeked = PEEKED_TEXT;
+                    stack[stackSize - 1] = XmlScope.ELEMENT_CONTENT
+                    buffer.readByte() // consume '>'
+                    val nextChar = nextNonWhitespace(true)
+                    if (nextChar != '<'.code) {
+                        return PEEKED_TEXT.also { peeked = it }
                     }
-
-                    if (isCDATA()) {
-                        buffer.skip(9); // skip opening cdata tag
-                        return peeked = PEEKED_CDATA;
+                    if (isCDATA) {
+                        buffer.skip(9) // skip opening cdata tag
+                        return PEEKED_CDATA.also { peeked = it }
                     }
-                    break;
-
-                case '/':
-                    // Self closing />
-
-                    if (fillBuffer(2) && buffer.getByte(1) == '>') {
+                }
+                '/' -> // Self closing />
+                    return if (fillBuffer(2) && buffer[1] == '>'.code.toByte()) {
                         // remove XmlScope.ELEMENT_ATTRIBUTE from top of the stack
-                        popStack();
+                        popStack()
 
                         // correct closing xml tag
-                        buffer.skip(2); // consuming '/>'
-
-                        return peeked = PEEKED_END_TAG;
+                        buffer.skip(2) // consuming '/>'
+                        PEEKED_END_TAG.also { peeked = it }
                     } else {
-                        throw syntaxError("Expected closing />");
+                        throw syntaxError("Expected closing />")
                     }
-
-                case '=':
-                    buffer.readByte(); // consume '='
+                '=' -> {
+                    buffer.readByte() // consume '='
 
                     // Read next char which should be a quote
-                    c = nextNonWhitespace(true);
-
-                    switch (c) {
-                        case '"':
-                            buffer.readByte(); // consume "
-                            return peeked = PEEKED_DOUBLE_QUOTED;
-                        case '\'':
-                            buffer.readByte(); // consume '
-                            return peeked = PEEKED_SINGLE_QUOTED;
-
-                        default:
-                            throw syntaxError(
-                                    "Expected double quote (\") or single quote (') while reading xml elements attribute");
+                    c = nextNonWhitespace(true)
+                    return when (c.toChar()) {
+                        '"' -> {
+                            buffer.readByte() // consume "
+                            PEEKED_DOUBLE_QUOTED.also { peeked = it }
+                        }
+                        '\'' -> {
+                            buffer.readByte() // consume '
+                            PEEKED_SINGLE_QUOTED.also { peeked = it }
+                        }
+                        else -> throw syntaxError(
+                            "Expected double quote (\") or single quote (') while reading xml elements attribute"
+                        )
                     }
-
-                default:
-                    throw syntaxError("Unexpected character '"
-                            + ((char) c)
-                            + "' while trying to read xml elements attribute");
+                }
+                else -> throw syntaxError(
+                    "Unexpected character '"
+                            + c.toChar()
+                            + "' while trying to read xml elements attribute"
+                )
             }
         } else if (peekStack == XmlScope.ELEMENT_CONTENT) {
-            int c = nextNonWhitespace(true);
-
-            if (c != '<') {
-                return peeked = PEEKED_TEXT;
+            val c = nextNonWhitespace(true)
+            if (c != '<'.code) {
+                return PEEKED_TEXT.also { peeked = it }
             }
-
-            if (isCDATA()) {
-                buffer.skip(9); // skip opening cdata tag
-                return peeked = PEEKED_CDATA;
+            if (isCDATA) {
+                buffer.skip(9) // skip opening cdata tag
+                return PEEKED_CDATA.also { peeked = it }
             }
         } else if (peekStack == XmlScope.EMPTY_DOCUMENT) {
-            stack[stackSize - 1] = XmlScope.NONEMPTY_DOCUMENT;
+            stack[stackSize - 1] = XmlScope.NONEMPTY_DOCUMENT
         } else if (peekStack == XmlScope.NONEMPTY_DOCUMENT) {
-            int c = nextNonWhitespace(false);
+            val c = nextNonWhitespace(false)
             if (c == -1) {
-                return peeked = PEEKED_EOF;
+                return PEEKED_EOF.also { peeked = it }
             }
-        } else if (peekStack == XmlScope.CLOSED) {
-            throw new IllegalStateException("XmlReader is closed");
-        }
-
-        int c = nextNonWhitespace(true, peekStack == XmlScope.EMPTY_DOCUMENT);
-        switch (c) {
-            // Handling open < and closing </
-            case '<':
-                buffer.readByte(); // consume '<'.
+        } else check(peekStack != XmlScope.CLOSED) { "XmlReader is closed" }
+        when (nextNonWhitespace(true, peekStack == XmlScope.EMPTY_DOCUMENT).toChar()) {
+            '<' -> {
+                buffer.readByte() // consume '<'.
 
                 // Check if </ which means end of element
-                if (fillBuffer(1) && buffer.getByte(0) == '/') {
-
-                    buffer.readByte(); // consume /
+                if (fillBuffer(1) && buffer[0] == '/'.code.toByte()) {
+                    buffer.readByte() // consume /
 
                     // Check if it is the corresponding xml element name
-                    String closingElementName = nextUnquotedValue();
-                    if (closingElementName.equals(pathNames[stackSize - 1])) {
-                        if (nextNonWhitespace(false) == '>') {
-                            buffer.readByte(); // consume >
-                            return peeked = PEEKED_END_TAG;
+                    val closingElementName = nextUnquotedValue()
+                    if (closingElementName == pathNames[stackSize - 1]) {
+                        if (nextNonWhitespace(false) == '>'.code) {
+                            buffer.readByte() // consume >
+                            return PEEKED_END_TAG.also { peeked = it }
                         } else {
-                            syntaxError("Missing closing '>' character in </" + pathNames[stackSize - 1]);
+                            throw syntaxError("Missing closing '>' character in </" + pathNames[stackSize - 1])
                         }
                     } else {
-                        syntaxError("Expected a closing element tag </"
-                                + pathNames[stackSize - 1]
-                                + "> but found </"
-                                + closingElementName
-                                + ">");
+                        throw syntaxError(
+                            "Expected a closing element tag </"
+                                    + pathNames[stackSize - 1]
+                                    + "> but found </"
+                                    + closingElementName
+                                    + ">"
+                        )
                     }
                 }
                 // its just a < which means begin of the element
-                return peeked = PEEKED_BEGIN_TAG;
-
-            case '"':
-                buffer.readByte(); // consume '"'.
-                return peeked = PEEKED_DOUBLE_QUOTED;
-
-            case '\'':
-                buffer.readByte(); // consume '
-                return peeked = PEEKED_SINGLE_QUOTED;
+                return PEEKED_BEGIN_TAG.also { peeked = it }
+            }
+            '"' -> {
+                buffer.readByte() // consume '"'.
+                return PEEKED_DOUBLE_QUOTED.also { peeked = it }
+            }
+            '\'' -> {
+                buffer.readByte() // consume '
+                return PEEKED_SINGLE_QUOTED.also { peeked = it }
+            }
         }
-
-        return PEEKED_NONE;
+        return PEEKED_NONE
     }
 
     /**
-     * Checks for CDATA beginning {@code <![CDATA[ }. This method doesn't consume the opening CDATA
+     * Checks for CDATA beginning `<![CDATA[ `. This method doesn't consume the opening CDATA
      * Tag
      *
      * @return true, if CDATA opening tag, otherwise false
      */
-    private boolean isCDATA() throws IOException {
-        return fillBuffer(CDATA_OPEN.size()) && buffer.rangeEquals(0, CDATA_OPEN);
-    }
+    private val isCDATA: Boolean
+        get() = fillBuffer(CDATA_OPEN.size.toLong()) && buffer.rangeEquals(0, CDATA_OPEN)
 
     /**
-     * Checks for DOCTYPE beginning {@code <!DOCTYPE }. This method doesn't consume the opening <!DOCTYPE
-     * Tag
-     *
-     * @return true, if DOCTYPE opening tag, otherwise false
+     * Checks for DOCTYPE beginning `<!DOCTYPE `. This method doesn't consume the opening
      */
-    private boolean isDocTypeDefinition() {
-        return buffer.size() >= DOCTYPE_OPEN.size() &&
-                buffer.snapshot(DOCTYPE_OPEN.size()).toAsciiUppercase().equals(DOCTYPE_OPEN);
-    }
+    private val isDocTypeDefinition: Boolean
+        get() = buffer.size >= DOCTYPE_OPEN.size &&
+                buffer.snapshot(DOCTYPE_OPEN.size).toAsciiUppercase() == DOCTYPE_OPEN
 
     /**
      * Consumes the next token from the JSON stream and asserts that it is the beginning of a new
      * object.
      */
-    public void beginTag() throws IOException {
-        int p = peeked;
+    fun beginTag() {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
-        if (p == PEEKED_BEGIN_TAG) {
-            pushStack(XmlScope.ELEMENT_OPENING);
-            peeked = PEEKED_NONE;
+        peeked = if (p == PEEKED_BEGIN_TAG) {
+            pushStack(XmlScope.ELEMENT_OPENING)
+            PEEKED_NONE
         } else {
-            throw new XmlDataException("Expected " + Token.BEGIN_TAG + " but was " + peek()
-                    + " at path " + getPath());
+            throw XmlDataException(
+                "Expected " + Token.BEGIN_TAG + " but was " + peek()
+                        + " at path " + path
+            )
         }
     }
 
@@ -308,189 +221,197 @@ public class XmlReader implements Closeable {
      * Consumes the next token from the JSON stream and asserts that it is the end of the current
      * object.
      */
-    public void endTag() throws IOException {
-        int p = peeked;
+    fun endTag() {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
-        if (p == PEEKED_END_TAG) {
-            popStack();
-            peeked = PEEKED_NONE;
+        peeked = if (p == PEEKED_END_TAG) {
+            popStack()
+            PEEKED_NONE
         } else {
-            throw syntaxError("Expected end of element but was " + peek());
+            throw syntaxError("Expected end of element but was " + peek())
         }
     }
 
     /**
-     * Consumes the next token attribute of a xml element. Assumes that {@link #beginTag()} has
+     * Consumes the next token attribute of a xml element. Assumes that [.beginTag] has
      * been called before
      *
      * @return The name of the attribute
      */
-    public String nextAttribute() throws IOException {
-        int p = peeked;
+    fun nextAttribute(): String {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
         if (p != PEEKED_ATTRIBUTE_NAME) {
-            throw syntaxError("Expected xml element attribute name but was " + peek());
+            throw syntaxError("Expected xml element attribute name but was " + peek())
         }
-
-        String result = nextUnquotedValue();
-        peeked = PEEKED_NONE;
-        pathNames[stackSize - 1] = result;
-        return result;
+        val result = nextUnquotedValue()
+        peeked = PEEKED_NONE
+        pathNames[stackSize - 1] = result
+        return result
     }
 
     /**
-     * Consumes the next attribute's value. Assumes that {@link #nextAttribute()} has been called
+     * Consumes the next attribute's value. Assumes that [.nextAttribute] has been called
      * before invoking this method
      *
      * @return The value of the attribute as string
      */
-    public String nextValue() throws IOException {
-        int p = peeked;
+    fun nextValue(): String {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
-
-        if (p == PEEKED_DOUBLE_QUOTED || p == PEEKED_SINGLE_QUOTED) {
-            String attributeValue =
-                    nextQuotedValue(p == PEEKED_DOUBLE_QUOTED ? DOUBLE_QUOTE : SINGLE_QUOTE);
-
-            peeked = PEEKED_NONE;
+        return if (p == PEEKED_DOUBLE_QUOTED || p == PEEKED_SINGLE_QUOTED) {
+            val attributeValue =
+                nextQuotedValue(if (p == PEEKED_DOUBLE_QUOTED) DOUBLE_QUOTE else SINGLE_QUOTE)
+            peeked = PEEKED_NONE
             pathNames[stackSize - 1] =
-                    null; // Remove attribute name from stack, do that after nextQuotedValue() to ensure that xpath is correctly in case that nextQuotedValue() fails
-            return attributeValue;
+                null // Remove attribute name from stack, do that after nextQuotedValue() to ensure that xpath is correctly in case that nextQuotedValue() fails
+            attributeValue
         } else {
-            throw new XmlDataException(
-                    "Expected xml element attribute value (in double quotes or single quotes) but was "
-                            + peek()
-                            + " at path "
-                            + getPath());
+            throw XmlDataException(
+                "Expected xml element attribute value (in double quotes or single quotes) but was "
+                        + peek()
+                        + " at path "
+                        + path
+            )
         }
     }
 
     /**
-     * Skip the value of an attribute if you don't want to read the value. {@link
-     * #nextAttribute()} must be called before invoking this method
+     * Skip the value of an attribute if you don't want to read the value. [ ][.nextAttribute] must be called before invoking this method
      */
-    public void skipAttributeValue() throws IOException {
-        int p = peeked;
+    private fun skipAttributeValue() {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
-
         if (p == PEEKED_DOUBLE_QUOTED || p == PEEKED_SINGLE_QUOTED) {
-            peeked = PEEKED_NONE;
-            pathNames[stackSize - 1] = null; // Remove attribute name from stack
-            skipQuotedValue(p == PEEKED_DOUBLE_QUOTED ? DOUBLE_QUOTE : SINGLE_QUOTE);
+            peeked = PEEKED_NONE
+            pathNames[stackSize - 1] = null // Remove attribute name from stack
+            skipQuotedValue(if (p == PEEKED_DOUBLE_QUOTED) DOUBLE_QUOTE else SINGLE_QUOTE)
         } else {
-            throw new XmlDataException(
-                    "Expected xml element attribute value (in double quotes or single quotes) but was "
-                            + peek()
-                            + " at path "
-                            + getPath());
+            throw XmlDataException(
+                "Expected xml element attribute value (in double quotes or single quotes) but was "
+                        + peek()
+                        + " at path "
+                        + path
+            )
         }
     }
 
     /**
-     * Get the next text content of an xml element. Text content is {@code <element>text
-     * content</element>}
+     * Get the next text content of an xml element. Text content is `<element>text
+     * content</element>`
      *
-     * If the element is empty (no content) like {@code <element></element>} this method will return
+     * If the element is empty (no content) like `<element></element>` this method will return
      * the empty string "".
      *
-     * {@code null} as return type is not supported yet, because there is no way in xml to distinguish
-     * between empty string "" or null since both might be represented with {@code
-     * <element></element>}. So if you want to represent a null element, simply don't write the
+     * `null` as return type is not supported yet, because there is no way in xml to distinguish
+     * between empty string "" or null since both might be represented with `<element></element>`. So if you want to represent a null element, simply don't write the
      * corresponding xml tag. Then the parser will not try set the mapped field and it will remain the
      * default value (which is null).
      *
      * @return The xml element's text content
      */
-    public String nextText() throws IOException {
-        int p = peeked;
+    fun nextText(): String {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
+        return when (p) {
+            PEEKED_TEXT -> {
+                peeked = PEEKED_NONE
 
-        if (p == PEEKED_TEXT) {
-            peeked = PEEKED_NONE;
-
-            // Read text until '<' found
-            long index = source.indexOf(OPENING_XML_ELEMENT);
-            if (index == -1L) {
-                throw syntaxError("Unterminated element text content. Expected </"
-                        + pathNames[stackSize - 1]
-                        + "> but haven't found");
+                // Read text until '<' found
+                val index = source.indexOf(OPENING_XML_ELEMENT)
+                if (index == -1L) {
+                    throw syntaxError(
+                        "Unterminated element text content. Expected </"
+                                + pathNames[stackSize - 1]
+                                + "> but haven't found"
+                    )
+                }
+                buffer.readUtf8(index)
             }
+            PEEKED_CDATA -> {
+                peeked = PEEKED_NONE
 
-            return buffer.readUtf8(index);
-        } else if (p == PEEKED_CDATA) {
-            peeked = PEEKED_NONE;
+                // Search index of closing CDATA tag ]]>
+                val index = indexOfClosingCDATA()
+                val result = buffer.readUtf8(index)
+                buffer.skip(3) // consume ]]>
+                result
+            }
+            PEEKED_END_TAG -> {
+                // this is an element without any text content. i.e. <foo></foo>.
+                // In that case we return the default value of a string which is the empty string
 
-            // Search index of closing CDATA tag ]]>
-            long index = indexOfClosingCDATA();
-
-            String result = buffer.readUtf8(index);
-            buffer.skip(3); // consume ]]>
-            return result;
-        } else if (p == PEEKED_END_TAG) {
-            // this is an element without any text content. i.e. <foo></foo>.
-            // In that case we return the default value of a string which is the empty string
-
-            // Don't do peeked = PEEKED_NONE; because that would consume the end tag, which we haven't done yet.
-            return "";
-        } else {
-            throw new XmlDataException("Expected xml element text content but was " + peek()
-                    + " at path " + getPath());
+                // Don't do peeked = PEEKED_NONE; because that would consume the end tag, which we haven't done yet.
+                ""
+            }
+            else -> {
+                throw XmlDataException(
+                    "Expected xml element text content but was " + peek()
+                            + " at path " + path
+                )
+            }
         }
     }
 
     /**
-     * Returns the index of the last character before starting the CDATA closing tag "{@code ]]>}".
+     * Returns the index of the last character before starting the CDATA closing tag "`]]>`".
      * This method does not consume the closing CDATA tag.
      *
      * @return index of last character before closing tag.
      */
-    private long indexOfClosingCDATA() throws IOException {
-        long index = source.indexOf(CDATA_CLOSE);
-        if (index == -1) {
-            throw new EOFException("<![CDATA[ at " + getPath() + " has never been closed with ]]>");
+    private fun indexOfClosingCDATA(): Long {
+        val index = source.indexOf(CDATA_CLOSE)
+        if (index == -1L) {
+            throw EOFException("<![CDATA[ at $path has never been closed with ]]>")
         }
-        return index;
+        return index
     }
 
     /**
-     * Skip the text content. Text content is {@code <element>text content</element>}
+     * Skip the text content. Text content is `<element>text content</element>`
      */
-    public void skipText() throws IOException {
-        int p = peeked;
+    private fun skipText() {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
+        when (p) {
+            PEEKED_TEXT -> {
+                peeked = PEEKED_NONE
 
-        if (p == PEEKED_TEXT) {
-            peeked = PEEKED_NONE;
-
-            // Read text until '<' found
-            long index = source.indexOf(OPENING_XML_ELEMENT);
-            if (index == -1L) {
-                throw syntaxError("Unterminated element text content. Expected </"
-                        + pathNames[stackSize - 1]
-                        + "> but haven't found");
+                // Read text until '<' found
+                val index = source.indexOf(OPENING_XML_ELEMENT)
+                if (index == -1L) {
+                    throw syntaxError(
+                        "Unterminated element text content. Expected </"
+                                + pathNames[stackSize - 1]
+                                + "> but haven't found"
+                    )
+                }
+                buffer.skip(index)
             }
-
-            buffer.skip(index);
-        } else if (p == PEEKED_CDATA) {
-            peeked = PEEKED_NONE;
-            // Search index of closing CDATA tag ]]>
-            long index = indexOfClosingCDATA();
-            buffer.skip(index + 3); // +3 because of consuming closing tag
-        } else {
-            throw new XmlDataException("Expected xml element text content but was " + peek()
-                    + " at path " + getPath());
+            PEEKED_CDATA -> {
+                peeked = PEEKED_NONE
+                // Search index of closing CDATA tag ]]>
+                val index = indexOfClosingCDATA()
+                buffer.skip(index + 3) // +3 because of consuming closing tag
+            }
+            else -> {
+                throw XmlDataException(
+                    "Expected xml element text content but was " + peek()
+                            + " at path " + path
+                )
+            }
         }
     }
 
@@ -499,68 +420,59 @@ public class XmlReader implements Closeable {
      *
      * @param newTop The scope that should be pushed on top of the stack
      */
-    private void pushStack(int newTop) {
-        if (stackSize == stack.length) {
-            int[] newStack = new int[stackSize * 2];
-            int[] newPathIndices = new int[stackSize * 2];
-            String[] newPathNames = new String[stackSize * 2];
-            System.arraycopy(stack, 0, newStack, 0, stackSize);
-            System.arraycopy(pathIndices, 0, newPathIndices, 0, stackSize);
-            System.arraycopy(pathNames, 0, newPathNames, 0, stackSize);
-            stack = newStack;
-            pathIndices = newPathIndices;
-            pathNames = newPathNames;
+    private fun pushStack(newTop: Int) {
+        if (stackSize == stack.size) {
+            val newStack = IntArray(stackSize * 2)
+            val newPathIndices = IntArray(stackSize * 2)
+            val newPathNames = arrayOfNulls<String>(stackSize * 2)
+            System.arraycopy(stack, 0, newStack, 0, stackSize)
+            System.arraycopy(pathIndices, 0, newPathIndices, 0, stackSize)
+            System.arraycopy(pathNames, 0, newPathNames, 0, stackSize)
+            stack = newStack
+            pathIndices = newPathIndices
+            pathNames = newPathNames
         }
-        stack[stackSize++] = newTop;
+        stack[stackSize++] = newTop
     }
 
     /**
      * Removes the top element of the stack
      */
-    private void popStack() {
-        stack[stackSize - 1] = 0;
-        stackSize--;
-        pathNames[stackSize] = null; // Free the last path name so that it can be garbage collected!
-        pathIndices[stackSize - 1]++;
+    private fun popStack() {
+        stack[stackSize - 1] = 0
+        stackSize--
+        pathNames[stackSize] = null // Free the last path name so that it can be garbage collected!
+        pathIndices[stackSize - 1]++
     }
 
     /**
      * Returns a XPath to the current location in the XML value.
      */
-    public String getPath() {
-        return XmlScope.getPath(stackSize, stack, pathNames, pathIndices);
-    }
+    val path: String
+        get() = XmlScope.getPath(stackSize, stack, pathNames, pathIndices)
 
-    @Override
-    public void close() throws IOException {
-        peeked = PEEKED_NONE;
-        buffer.clear();
-        source.close();
+    override fun close() {
+        peeked = PEEKED_NONE
+        buffer.clear()
+        source.close()
     }
 
     /**
-     * Returns true once {@code limit - pos >= minimum}. If the data is exhausted before that many
+     * Returns true once `limit - pos >= minimum`. If the data is exhausted before that many
      * characters are available, this returns false.
      */
-    private boolean fillBuffer(long minimum) throws IOException {
-        return source.request(minimum);
-    }
-
+    private fun fillBuffer(minimum: Long): Boolean = source.request(minimum)
     /**
      * Returns the next character in the stream that is neither whitespace nor a part of a comment.
-     * When this returns, the returned character is always at {@code buffer[pos-1]}; this means the
-     * caller can always pushStack back the returned character by decrementing {@code pos}.
+     * When this returns, the returned character is always at `buffer[pos-1]`; this means the
+     * caller can always pushStack back the returned character by decrementing `pos`.
      */
-    private int nextNonWhitespace(boolean throwOnEof) throws IOException {
-        return nextNonWhitespace(throwOnEof, false);
-    }
-
     /**
      * Returns the next character in the stream that is neither whitespace nor a part of a comment.
-     * When this returns, the returned character is always at {@code buffer[pos-1]}; this means the
-     * caller can always pushStack back the returned character by decrementing {@code pos}.
+     * When this returns, the returned character is always at `buffer[pos-1]`; this means the
+     * caller can always pushStack back the returned character by decrementing `pos`.
      */
-    private int nextNonWhitespace(boolean throwOnEof, boolean isDocumentBeginning) throws IOException {
+    private fun nextNonWhitespace(throwOnEof: Boolean, isDocumentBeginning: Boolean = false): Int {
         /*
          * This code uses ugly local variables 'p' and 'l' representing the 'pos'
          * and 'limit' fields respectively. Using locals rather than fields saves
@@ -572,67 +484,62 @@ public class XmlReader implements Closeable {
 
         // Look for UTF-8 BOM sequence 0xEFBBBF and skip it
         if (isDocumentBeginning && source.rangeEquals(0, UTF8_BOM)) {
-            source.skip(3);
+            source.skip(3)
         }
-
-        int p = 0;
-        while (fillBuffer(p + 1)) {
-            int c = buffer.getByte(p++);
-            if (c == '\n' || c == ' ' || c == '\r' || c == '\t') {
-                continue;
+        var p = 0
+        while (fillBuffer((p + 1).toLong())) {
+            val c = buffer[p++.toLong()].toInt()
+            if (c == '\n'.code || c == ' '.code || c == '\r'.code || c == '\t'.code) {
+                continue
             }
-
-            buffer.skip(p - 1);
-            if (c == '<' && !isCDATA() && fillBuffer(2)) {
-
-                byte peek = buffer.getByte(1);
-                int peekStack = stack[stackSize - 1];
-
-                if (peekStack == XmlScope.NONEMPTY_DOCUMENT && isDocTypeDefinition()) {
-                    long index = source.indexOf(CLOSING_XML_ELEMENT, DOCTYPE_OPEN.size());
-                    if (index == -1) {
-                        throw syntaxError("Unterminated <!DOCTYPE> . Inline DOCTYPE is not support at the moment.");
+            buffer.skip((p - 1).toLong())
+            if (c == '<'.code && !isCDATA && fillBuffer(2)) {
+                val peek = buffer[1]
+                val peekStack = stack[stackSize - 1]
+                if (peekStack == XmlScope.NONEMPTY_DOCUMENT && isDocTypeDefinition) {
+                    var index = source.indexOf(CLOSING_XML_ELEMENT, DOCTYPE_OPEN.size.toLong())
+                    if (index == -1L) {
+                        throw syntaxError("Unterminated <!DOCTYPE> . Inline DOCTYPE is not support at the moment.")
                     }
                     // check if doctype uses brackets
-                    long bracketIndex = source.indexOf(OPENING_DOCTYPE_BRACKET, DOCTYPE_OPEN.size(), index);
-                    if (bracketIndex != -1) {
-                        index = source.indexOf(ByteString.of(CLOSING_DOCTYPE_BRACKET, CLOSING_XML_ELEMENT), index + bracketIndex);
-                        if (index == -1) {
-                            throw syntaxError("Unterminated <!DOCTYPE []>. Expected closing ]>");
+                    val bracketIndex = source.indexOf(OPENING_DOCTYPE_BRACKET, DOCTYPE_OPEN.size.toLong(), index)
+                    if (bracketIndex != -1L) {
+                        index =
+                            source.indexOf(ByteString.of(CLOSING_DOCTYPE_BRACKET, CLOSING_XML_ELEMENT), index + bracketIndex)
+                        if (index == -1L) {
+                            throw syntaxError("Unterminated <!DOCTYPE []>. Expected closing ]>")
                         }
-                        source.skip(index + 2); // skip behind ]>
+                        source.skip(index + 2) // skip behind ]>
                     } else {
-                        source.skip(index + 1); // skip behind >
+                        source.skip(index + 1) // skip behind >
                     }
                     // TODO inline DOCTYPE.
-                    p = 0;
-                    continue;
-                } else if (peek == '!' && fillBuffer(4)) {
-                    long index = source.indexOf(COMMENT_CLOSE, 4); // skip <!-- in comparison by offset 4
-                    if (index == -1) {
-                        throw syntaxError("Unterminated comment");
+                    p = 0
+                    continue
+                } else if (peek == '!'.code.toByte() && fillBuffer(4)) {
+                    val index = source.indexOf(COMMENT_CLOSE, 4) // skip <!-- in comparison by offset 4
+                    if (index == -1L) {
+                        throw syntaxError("Unterminated comment")
                     }
-                    source.skip(index + COMMENT_CLOSE.size()); // skip behind --!>
-                    p = 0;
-                    continue;
-                } else if (peek == '?') {
-                    long index = source.indexOf(XML_DECLARATION_CLOSE, 2); // skip <? in comparison by offset 2
-                    if (index == -1) {
-                        throw syntaxError("Unterminated xml declaration or processing instruction \"<?\"");
+                    source.skip(index + COMMENT_CLOSE.size) // skip behind --!>
+                    p = 0
+                    continue
+                } else if (peek == '?'.code.toByte()) {
+                    val index = source.indexOf(XML_DECLARATION_CLOSE, 2) // skip <? in comparison by offset 2
+                    if (index == -1L) {
+                        throw syntaxError("Unterminated xml declaration or processing instruction \"<?\"")
                     }
-                    source.skip(index + XML_DECLARATION_CLOSE.size()); // skip behind ?>
-                    p = 0;
-                    continue;
+                    source.skip(index + XML_DECLARATION_CLOSE.size) // skip behind ?>
+                    p = 0
+                    continue
                 }
             }
-
-            return c;
+            return c
         }
-
-        if (throwOnEof) {
-            throw new EOFException("Unexpected end of input at path " + getPath());
+        return if (throwOnEof) {
+            throw EOFException("Unexpected end of input at path $path")
         } else {
-            return -1;
+            -1
         }
     }
 
@@ -640,75 +547,71 @@ public class XmlReader implements Closeable {
      * Throws a new IO exception with the given message and a context snippet with this reader's
      * content.
      */
-    private IOException syntaxError(String message) throws IOException {
-        throw new IOException(message + " at path " + getPath());
-    }
+    private fun syntaxError(message: String): IOException = IOException("$message at path $path")
 
     /**
      * Get the name of the opening xml name
      *
      * @return The name
      */
-    public String nextTagName() throws IOException {
-        int p = peeked;
+    fun nextTagName(): String? {
+        var p = peeked
         if (p == PEEKED_NONE) {
-            p = doPeek();
+            p = doPeek()
         }
         if (p != PEEKED_ELEMENT_NAME) {
-            throw syntaxError("Expected XML Tag Element name, but have " + peek());
+            throw syntaxError("Expected XML Tag Element name, but have " + peek())
         }
-
-        currentTagName = nextUnquotedValue();
-
-        peeked = PEEKED_NONE;
-        pathNames[stackSize - 1] = currentTagName;
+        currentTagName = nextUnquotedValue()
+        peeked = PEEKED_NONE
+        pathNames[stackSize - 1] = currentTagName
 
         // Next we expect element attributes block
-        pushStack(XmlScope.ELEMENT_ATTRIBUTE);
-        return currentTagName;
+        pushStack(XmlScope.ELEMENT_ATTRIBUTE)
+        return currentTagName
     }
 
-    /** Returns an unquoted value as a string. */
-    private String nextUnquotedValue() throws IOException {
-        long i = source.indexOfElement(UNQUOTED_STRING_TERMINALS);
-        return i != -1 ? buffer.readUtf8(i) : buffer.readUtf8();
+    /** Returns an unquoted value as a string.  */
+    private fun nextUnquotedValue(): String {
+        val i = source.indexOfElement(UNQUOTED_STRING_TERMINALS)
+        return if (i != -1L) buffer.readUtf8(i) else buffer.readUtf8()
     }
 
     /**
-     * Returns the string up to but not including {@code quote}, non-escaping any character escape
+     * Returns the string up to but not including `quote`, non-escaping any character escape
      * sequences encountered along the way. The opening quote should have already been read. This
      * consumes the closing quote, but does not include it in the returned string.
      *
      * @throws IOException if any unicode escape sequences are malformed.
      */
-    private String nextQuotedValue(byte runTerminator) throws IOException {
-        StringBuilder builder = null;
+    private fun nextQuotedValue(runTerminator: Byte): String {
+        var builder: StringBuilder? = null
         while (true) {
-            long index = source.indexOf(runTerminator);
+            val index = source.indexOf(runTerminator)
             if (index == -1L) {
                 throw syntaxError(
-                        "Unterminated string (" + (runTerminator == DOUBLE_QUOTE ? "double quote \""
-                                : "single quote '") + " is missing)");
+                    "Unterminated string (" + (if (runTerminator == DOUBLE_QUOTE) "double quote \"" else "single quote '") + " is missing)"
+                )
             }
 
             // If we've got an escape character, we're going to need a string builder.
-            if (buffer.getByte(index) == '\\') {
-                if (builder == null) builder = new StringBuilder();
-                builder.append(buffer.readUtf8(index));
-                buffer.readByte(); // '\'
-                builder.append(readEscapeCharacter());
-                continue;
+            if (buffer[index] == '\\'.code.toByte()) {
+                if (builder == null) builder = StringBuilder()
+                builder.append(buffer.readUtf8(index))
+                buffer.readByte() // '\'
+                builder.append(readEscapeCharacter())
+                continue
             }
 
             // If it isn't the escape character, it's the quote. Return the string.
-            if (builder == null) {
-                String result = buffer.readUtf8(index);
-                buffer.readByte(); // Consume the quote character.
-                return result;
+            return if (builder == null) {
+                val result = buffer.readUtf8(index)
+                buffer.readByte() // Consume the quote character.
+                result
             } else {
-                builder.append(buffer.readUtf8(index));
-                buffer.readByte(); // Consume the quote character.
-                return builder.toString();
+                builder.append(buffer.readUtf8(index))
+                buffer.readByte() // Consume the quote character.
+                builder.toString()
             }
         }
     }
@@ -719,17 +622,10 @@ public class XmlReader implements Closeable {
      * @param c the character to check
      * @return true if literal, otherwise false
      */
-    private boolean isLiteral(int c) {
-        switch (c) {
-            case '=':
-            case '<':
-            case '>':
-            case '/':
-            case ' ':
-                return false;
-            default:
-                return true;
-        }
+    private fun isLiteral(c: Int): Boolean =
+        when (c.toChar()) {
+            '=', '<', '>', '/', ' ' -> false
+            else -> true
     }
 
     /**
@@ -739,56 +635,36 @@ public class XmlReader implements Closeable {
      *
      * @throws IOException if any unicode escape sequences are malformed.
      */
-    private char readEscapeCharacter() throws IOException {
+    private fun readEscapeCharacter(): Char {
         if (!fillBuffer(1)) {
-            throw syntaxError("Unterminated escape sequence");
+            throw syntaxError("Unterminated escape sequence")
         }
-
-        byte escaped = buffer.readByte();
-        switch (escaped) {
-            case 'u':
+        return when (val escaped = buffer.readByte().toInt().toChar()) {
+            'u' -> {
                 if (!fillBuffer(4)) {
-                    throw new EOFException("Unterminated escape sequence at path " + getPath());
+                    throw EOFException("Unterminated escape sequence at path $path")
                 }
                 // Equivalent to Integer.parseInt(stringPool.get(buffer, pos, 4), 16);
-                char result = 0;
-                for (int i = 0, end = i + 4; i < end; i++) {
-                    byte c = buffer.getByte(i);
-                    result <<= 4;
-                    if (c >= '0' && c <= '9') {
-                        result += (c - '0');
-                    } else if (c >= 'a' && c <= 'f') {
-                        result += (c - 'a' + 10);
-                    } else if (c >= 'A' && c <= 'F') {
-                        result += (c - 'A' + 10);
-                    } else {
-                        throw syntaxError("\\u" + buffer.readUtf8(4));
+                var result = 0.toChar()
+                for (i in 0 until 4) {
+                    result = (result.code shl 4).toChar()
+                    result += when (val c = buffer[i.toLong()].toInt().toChar()) {
+                        in '0'..'9' -> c - '0'
+                        in 'a'..'f' -> c - 'a' + 10
+                        in 'A'..'F' -> c - 'A' + 10
+                        else -> throw syntaxError("\\u" + buffer.readUtf8(4))
                     }
                 }
-                buffer.skip(4);
-                return result;
-
-            case 't':
-                return '\t';
-
-            case 'b':
-                return '\b';
-
-            case 'n':
-                return '\n';
-
-            case 'r':
-                return '\r';
-
-            case 'f':
-                return '\f';
-
-            case '\n':
-            case '\'':
-            case '"':
-            case '\\':
-            default:
-                return (char) escaped;
+                buffer.skip(4)
+                result
+            }
+            't' -> '\t'
+            'b' -> '\b'
+            'n' -> '\n'
+            'r' -> '\r'
+            'f' -> '\u000C' /*\f*/
+            '\n', '\'', '"', '\\' -> escaped
+            else -> escaped
         }
     }
 
@@ -797,72 +673,51 @@ public class XmlReader implements Closeable {
      *
      * @param runTerminator The terminator to skip
      */
-    private void skipQuotedValue(Byte runTerminator) throws IOException {
+    private fun skipQuotedValue(runTerminator: Byte) {
         while (true) {
-            long index = source.indexOf(runTerminator);
-            if (index == -1L) throw syntaxError("Unterminated string");
-
-            if (buffer.getByte(index) == '\\') {
-                buffer.skip(index + 1);
-                readEscapeCharacter();
+            val index = source.indexOf(runTerminator)
+            if (index == -1L) throw syntaxError("Unterminated string")
+            if (buffer[index] == '\\'.code.toByte()) {
+                buffer.skip(index + 1)
+                readEscapeCharacter()
             } else {
-                buffer.skip(index + 1);
-                return;
+                buffer.skip(index + 1)
+                return
             }
         }
     }
 
     /**
-     * This method skips the rest of an xml Element. This method is typically invoked once {@link
-     * #beginTag()} ang {@link #nextTagName()} has been consumed, but we don't want to consume
+     * This method skips the rest of an xml Element. This method is typically invoked once [ ][.beginTag] ang [.nextTagName] has been consumed, but we don't want to consume
      * the xml element with the given name. So with this method we can  skip the whole remaining xml
      * element (attribute, text content and child elements) by using this method.
      */
-    public void skip() throws IOException {
-        int stackPeek = stack[stackSize - 1];
+    fun skip() {
+        val stackPeek = stack[stackSize - 1]
         if (stackPeek != XmlScope.ELEMENT_OPENING && stackPeek != XmlScope.ELEMENT_ATTRIBUTE) {
-            throw new AssertionError(
-                    "This method can only be invoked after having consumed the opening element via beginTag()");
+            throw AssertionError(
+                "This method can only be invoked after having consumed the opening element via beginTag()"
+            )
         }
-
-        int count = 1;
+        var count = 1
         do {
-            switch (peek()) {
-                case BEGIN_TAG:
-                    beginTag();
-                    count++;
-                    break;
-
-                case END_TAG:
-                    endTag();
-                    count--;
-                    break;
-
-                case ELEMENT_NAME:
-                    nextTagName(); // TODO add a skip element name method
-                    break;
-
-                case ATTRIBUTE:
-                    nextAttribute(); // TODO add a skip attribute name method
-                    break;
-
-                case VALUE:
-                    skipAttributeValue();
-                    break;
-
-                case TEXT:
-                    skipText();
-                    break;
-
-                case END_DOCUMENT:
-                    throw syntaxError("Unexpected end of file! At least one xml element is not closed!");
-
-                default:
-                    throw new AssertionError(
-                            "Oops, there is something not implemented correctly internally. Please fill an issue on https://github.com/Tickaroo/tikxml/issues . Please include stacktrace and the model class you try to parse");
+            when (peek()) {
+                Token.BEGIN_TAG -> {
+                    beginTag()
+                    count++
+                }
+                Token.END_TAG -> {
+                    endTag()
+                    count--
+                }
+                Token.ELEMENT_NAME -> nextTagName() // TODO add a skip element name method
+                Token.ATTRIBUTE -> nextAttribute() // TODO add a skip attribute name method
+                Token.VALUE -> skipAttributeValue()
+                Token.TEXT -> skipText()
+                Token.END_DOCUMENT -> throw syntaxError("Unexpected end of file! At least one xml element is not closed!")
             }
-            peeked = PEEKED_NONE;
-        } while (count != 0);
+            peeked = PEEKED_NONE
+        } while (count != 0)
     }
 
     /**
@@ -871,8 +726,7 @@ public class XmlReader implements Closeable {
      * private void skipUnquotedValue() throws IOException { long i = source.indexOfElement(UNQUOTED_STRING_TERMINALS);
      * buffer.skip(i != -1L ? i : buffer.size()); }
      */
-
-    public enum Token {
+    enum class Token {
         /**
          * Indicates that an xml element begins.
          */
@@ -899,8 +753,8 @@ public class XmlReader implements Closeable {
         VALUE,
 
         /**
-         * Indicates that we are reading the text content of an xml element like this {@code <element>
-         * This is the text content </element>}
+         * Indicates that we are reading the text content of an xml element like this `<element>
+         * This is the text content </element>`
          */
         TEXT,
 
@@ -908,5 +762,54 @@ public class XmlReader implements Closeable {
          * Indicates that we have reached the end of the document
          */
         END_DOCUMENT
+    }
+
+    companion object {
+        private val UNQUOTED_STRING_TERMINALS: ByteString = " >/=\n".encodeUtf8()
+        private val CDATA_CLOSE: ByteString = "]]>".encodeUtf8()
+        private val CDATA_OPEN: ByteString = "<![CDATA[".encodeUtf8()
+        private val DOCTYPE_OPEN: ByteString = "<!DOCTYPE".encodeUtf8()
+        private val COMMENT_CLOSE: ByteString = "-->".encodeUtf8()
+        private val XML_DECLARATION_CLOSE: ByteString = "?>".encodeUtf8()
+        private val UTF8_BOM: ByteString = ByteString.of(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+        private const val DOUBLE_QUOTE = '"'.code.toByte()
+        private const val SINGLE_QUOTE = '\''.code.toByte()
+        private const val OPENING_XML_ELEMENT = '<'.code.toByte()
+        private const val CLOSING_XML_ELEMENT = '>'.code.toByte()
+        private const val OPENING_DOCTYPE_BRACKET = '['.code.toByte()
+        private const val CLOSING_DOCTYPE_BRACKET = ']'.code.toByte()
+
+        //
+        // Peek states
+        //
+        /** Nothing peeked  */
+        private const val PEEKED_NONE = 0
+
+        /** Peeked an xml element / object  */
+        private const val PEEKED_BEGIN_TAG = 1
+
+        /** Peeked the closing xml tag which indicates the end of an object  */
+        private const val PEEKED_END_TAG = 2
+
+        /** Peeked the closing xml header tag, hence we are inner xml tag object body  */
+        private const val PEEKED_TEXT = 3
+
+        /** Peeked the end of the stream  */
+        private const val PEEKED_EOF = 4
+
+        /** Peeked an unquoted value which can be either xml element name or element attribute name  */
+        private const val PEEKED_ELEMENT_NAME = 5
+
+        /** Peeked a quoted value which is the value of an xml attribute  */
+        private const val PEEKED_DOUBLE_QUOTED = 6
+
+        /** Peeked a single quote which is the value of an xml attribute  */
+        private const val PEEKED_SINGLE_QUOTED = 7
+
+        /** Peeked an attribute name (of a xml element)  */
+        private const val PEEKED_ATTRIBUTE_NAME = 8
+
+        /** Peeked a CDATA  */
+        private const val PEEKED_CDATA = 9
     }
 }

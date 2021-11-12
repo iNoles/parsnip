@@ -441,7 +441,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         }
 
         @Override
-        T readValue(XmlReader reader) throws IOException {
+        T readValue(XmlReader reader) {
             return converter.from(reader.nextValue());
         }
 
@@ -465,7 +465,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         }
 
         @Override
-        T readValue(XmlReader reader) throws IOException {
+        T readValue(XmlReader reader) {
             return converter.from(reader.nextText());
         }
 
