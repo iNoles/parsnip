@@ -7,6 +7,7 @@ import okio.ByteString.Companion.encodeUtf8
 import java.io.Closeable
 import java.io.EOFException
 import java.io.IOException
+import kotlin.jvm.Throws
 
 //TODO: Namespace Support
 class XmlReader internal constructor(private val source: BufferedSource) : Closeable {
@@ -29,26 +30,19 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      *
      * @return [Token]
      */
-    fun peek(): Token {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
-        return when (p) {
-            PEEKED_BEGIN_TAG -> Token.BEGIN_TAG
-            PEEKED_ELEMENT_NAME -> Token.ELEMENT_NAME
-            PEEKED_END_TAG -> Token.END_TAG
-            PEEKED_ATTRIBUTE_NAME -> Token.ATTRIBUTE
-            PEEKED_DOUBLE_QUOTED, PEEKED_SINGLE_QUOTED -> Token.VALUE
-            PEEKED_TEXT, PEEKED_CDATA -> Token.TEXT
-            PEEKED_EOF -> Token.END_DOCUMENT
-            else -> throw AssertionError("Unknown Token: Peeked = $p")
-        }
+    fun peek(): Token = when (val p = peekIfNone()) {
+        PEEKED_BEGIN_TAG -> Token.BEGIN_TAG
+        PEEKED_ELEMENT_NAME -> Token.ELEMENT_NAME
+        PEEKED_END_TAG -> Token.END_TAG
+        PEEKED_ATTRIBUTE_NAME -> Token.ATTRIBUTE
+        PEEKED_DOUBLE_QUOTED, PEEKED_SINGLE_QUOTED -> Token.VALUE
+        PEEKED_TEXT, PEEKED_CDATA -> Token.TEXT
+        PEEKED_EOF -> Token.END_DOCUMENT
+        else -> throw AssertionError("Unknown Token: Peeked = $p")
     }
 
     /**
-     * Actually do a peek. This method will return the peeked token and updates the internal variable
-     * [.peeked]
+     * Actually do a peek. This method will return the peeked token and updates the internal variable [peeked]
      *
      * @return The peeked token
      */
@@ -57,14 +51,14 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         if (peekStack == XmlScope.ELEMENT_OPENING) {
             val c = nextNonWhitespace(true)
             return if (isLiteral(c.toChar().code)) {
-                PEEKED_ELEMENT_NAME.also { peeked = it }
+                setPeeked(PEEKED_ELEMENT_NAME)
             } else {
                 throw syntaxError("Expected xml element name (literal expected)")
             }
         } else if (peekStack == XmlScope.ELEMENT_ATTRIBUTE) {
             var c = nextNonWhitespace(true)
             if (isLiteral(c)) {
-                return PEEKED_ATTRIBUTE_NAME.also { peeked = it }
+                return setPeeked(PEEKED_ATTRIBUTE_NAME)
             }
             when (c.toChar()) {
                 '>' -> {
@@ -76,11 +70,11 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                     buffer.readByte() // consume '>'
                     val nextChar = nextNonWhitespace(true)
                     if (nextChar != '<'.code) {
-                        return PEEKED_TEXT.also { peeked = it }
+                        return setPeeked(PEEKED_TEXT)
                     }
                     if (isCDATA) {
                         buffer.skip(9) // skip opening cdata tag
-                        return PEEKED_CDATA.also { peeked = it }
+                        return setPeeked(PEEKED_CDATA)
                     }
                 }
                 '/' -> // Self closing />
@@ -90,7 +84,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
 
                         // correct closing xml tag
                         buffer.skip(2) // consuming '/>'
-                        PEEKED_END_TAG.also { peeked = it }
+                        setPeeked(PEEKED_END_TAG)
                     } else {
                         throw syntaxError("Expected closing />")
                     }
@@ -102,11 +96,11 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                     return when (c.toChar()) {
                         '"' -> {
                             buffer.readByte() // consume "
-                            PEEKED_DOUBLE_QUOTED.also { peeked = it }
+                            setPeeked(PEEKED_DOUBLE_QUOTED)
                         }
                         '\'' -> {
                             buffer.readByte() // consume '
-                            PEEKED_SINGLE_QUOTED.also { peeked = it }
+                            setPeeked(PEEKED_SINGLE_QUOTED)
                         }
                         else -> throw syntaxError(
                             "Expected double quote (\") or single quote (') while reading xml elements attribute"
@@ -122,20 +116,21 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         } else if (peekStack == XmlScope.ELEMENT_CONTENT) {
             val c = nextNonWhitespace(true)
             if (c != '<'.code) {
-                return PEEKED_TEXT.also { peeked = it }
+                return setPeeked(PEEKED_TEXT)
             }
             if (isCDATA) {
                 buffer.skip(9) // skip opening cdata tag
-                return PEEKED_CDATA.also { peeked = it }
+                return setPeeked(PEEKED_CDATA)
             }
         } else if (peekStack == XmlScope.EMPTY_DOCUMENT) {
             stack[stackSize - 1] = XmlScope.NONEMPTY_DOCUMENT
         } else if (peekStack == XmlScope.NONEMPTY_DOCUMENT) {
             val c = nextNonWhitespace(false)
             if (c == -1) {
-                return PEEKED_EOF.also { peeked = it }
+                return setPeeked(PEEKED_EOF)
             }
-        } else check(peekStack != XmlScope.CLOSED) { "XmlReader is closed" }
+        } else
+            check(peekStack != XmlScope.CLOSED) { "XmlReader is closed" }
         when (nextNonWhitespace(true, peekStack == XmlScope.EMPTY_DOCUMENT).toChar()) {
             '<' -> {
                 buffer.readByte() // consume '<'.
@@ -149,7 +144,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                     if (closingElementName == pathNames[stackSize - 1]) {
                         if (nextNonWhitespace(false) == '>'.code) {
                             buffer.readByte() // consume >
-                            return PEEKED_END_TAG.also { peeked = it }
+                            return setPeeked(PEEKED_END_TAG)
                         } else {
                             throw syntaxError("Missing closing '>' character in </" + pathNames[stackSize - 1])
                         }
@@ -164,15 +159,15 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                     }
                 }
                 // its just a < which means begin of the element
-                return PEEKED_BEGIN_TAG.also { peeked = it }
+                return setPeeked(PEEKED_BEGIN_TAG)
             }
             '"' -> {
                 buffer.readByte() // consume '"'.
-                return PEEKED_DOUBLE_QUOTED.also { peeked = it }
+                return setPeeked(PEEKED_DOUBLE_QUOTED)
             }
             '\'' -> {
                 buffer.readByte() // consume '
-                return PEEKED_SINGLE_QUOTED.also { peeked = it }
+                return setPeeked(PEEKED_SINGLE_QUOTED)
             }
         }
         return PEEKED_NONE
@@ -199,10 +194,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      * object.
      */
     fun beginTag() {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
+        val p = peekIfNone()
         peeked = if (p == PEEKED_BEGIN_TAG) {
             pushStack(XmlScope.ELEMENT_OPENING)
             PEEKED_NONE
@@ -219,10 +211,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      * object.
      */
     fun endTag() {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
+        val p = peekIfNone()
         peeked = if (p == PEEKED_END_TAG) {
             popStack()
             PEEKED_NONE
@@ -232,16 +221,13 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     /**
-     * Consumes the next token attribute of a xml element. Assumes that [.beginTag] has
+     * Consumes the next token attribute of a xml element. Assumes that [beginTag] has
      * been called before
      *
      * @return The name of the attribute
      */
     fun nextAttribute(): String {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
+        val p = peekIfNone()
         if (p != PEEKED_ATTRIBUTE_NAME) {
             throw syntaxError("Expected xml element attribute name but was " + peek())
         }
@@ -252,22 +238,20 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     /**
-     * Consumes the next attribute's value. Assumes that [.nextAttribute] has been called
+     * Consumes the next attribute's value. Assumes that [nextAttribute] has been called
      * before invoking this method
      *
      * @return The value of the attribute as string
      */
     fun nextValue(): String {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
+        val p = peekIfNone()
         return if (p == PEEKED_DOUBLE_QUOTED || p == PEEKED_SINGLE_QUOTED) {
             val attributeValue =
                 nextQuotedValue(if (p == PEEKED_DOUBLE_QUOTED) DOUBLE_QUOTE else SINGLE_QUOTE)
             peeked = PEEKED_NONE
-            pathNames[stackSize - 1] =
-                null // Remove attribute name from stack, do that after nextQuotedValue() to ensure that xpath is correctly in case that nextQuotedValue() fails
+            // Remove attribute name from stack, do that after nextQuotedValue() to ensure that xpath is correctly
+            // in case that nextQuotedValue() fails
+            pathNames[stackSize - 1] = null
             attributeValue
         } else {
             throw XmlDataException(
@@ -281,13 +265,10 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
 
     /**
      * Skip the value of an attribute if you don't want to read the value.
-     * [.nextAttributeName] must be called before invoking this method
+     * [nextAttribute] must be called before invoking this method
      */
     private fun skipAttributeValue() {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
+        val p = peekIfNone()
         if (p == PEEKED_DOUBLE_QUOTED || p == PEEKED_SINGLE_QUOTED) {
             peeked = PEEKED_NONE
             pathNames[stackSize - 1] = null // Remove attribute name from stack
@@ -303,25 +284,19 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     /**
-     * Get the next text content of an xml element. Text content is `<element>text
-     * content</element>`
+     * Get the next text content of an xml element. Text content is `<element>text content</element>`
      *
-     * If the element is empty (no content) like `<element></element>` this method will return
-     * the empty string "".
+     * If the element is empty (no content) like `<element></element>` this method will return the empty string "".
      *
      * `null` as return type is not supported yet, because there is no way in xml to distinguish
-     * between empty string "" or null since both might be represented with `<element></element>`. So if you want to represent a null element, simply don't write the
-     * corresponding xml tag. Then the parser will not try set the mapped field and it will remain the
-     * default value (which is null).
+     * between empty string "" or null since both might be represented with `<element></element>`.
+     * So if you want to represent a null element, simply don't write the corresponding xml tag. Then the parser
+     * will not try set the mapped field and it will remain the default value (which is null).
      *
      * @return The xml element's text content
      */
     fun nextText(): String {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
-        return when (p) {
+        return when (peekIfNone()) {
             PEEKED_TEXT -> {
                 peeked = PEEKED_NONE
 
@@ -348,7 +323,6 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
             PEEKED_END_TAG -> {
                 // this is an element without any text content. i.e. <foo></foo>.
                 // In that case we return the default value of a string which is the empty string
-
                 // Don't do peeked = PEEKED_NONE; because that would consume the end tag, which we haven't done yet.
                 ""
             }
@@ -379,11 +353,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      * Skip the text content. Text content is `<element>text content</element>`
      */
     private fun skipText() {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
-        when (p) {
+        when (peekIfNone()) {
             PEEKED_TEXT -> {
                 peeked = PEEKED_NONE
 
@@ -545,7 +515,10 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      * Throws a new IO exception with the given message and a context snippet with this reader's
      * content.
      */
-    private fun syntaxError(message: String): IOException = IOException("$message at path $path")
+    @Throws(IOException::class)
+    private fun syntaxError(message: String) : IOException {
+        throw IOException("$message at path $path")
+    }
 
     /**
      * Get the name of the opening xml name
@@ -553,10 +526,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      * @return The name
      */
     fun nextTagName(): String? {
-        var p = peeked
-        if (p == PEEKED_NONE) {
-            p = doPeek()
-        }
+        val p = peekIfNone()
         if (p != PEEKED_ELEMENT_NAME) {
             throw syntaxError("Expected XML Tag Element name, but have " + peek())
         }
@@ -687,7 +657,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
 
     /**
      * This method skips the rest of an xml Element.
-     * This method is typically invoked once [.beginTag] ang [.nextTagName] has been consumed,
+     * This method is typically invoked once [beginTag] ang [nextTagName] has been consumed,
      * but we don't want to consume the xml element with the given name.
      * So with this method we can skip the whole remaining xml element (attribute, text content and child elements)
      * by using this method.
@@ -718,6 +688,16 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
             }
             peeked = PEEKED_NONE
         } while (count != 0)
+    }
+
+    private fun peekIfNone(): Int {
+        val p = peeked
+        return if (p == PEEKED_NONE) doPeek() else p
+    }
+
+    private fun setPeeked(peekedType: Int): Int {
+        peeked = peekedType
+        return peekedType
     }
 
     enum class Token {
