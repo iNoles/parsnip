@@ -430,11 +430,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      * characters are available, this returns false.
      */
     private fun fillBuffer(minimum: Long): Boolean = source.request(minimum)
-    /**
-     * Returns the next character in the stream that is neither whitespace nor a part of a comment.
-     * When this returns, the returned character is always at `buffer[pos-1]`; this means the
-     * caller can always pushStack back the returned character by decrementing `pos`.
-     */
+
     /**
      * Returns the next character in the stream that is neither whitespace nor a part of a comment.
      * When this returns, the returned character is always at `buffer[pos-1]`; this means the
