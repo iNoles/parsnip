@@ -7,7 +7,6 @@ import okio.ByteString.Companion.encodeUtf8
 import java.io.Closeable
 import java.io.EOFException
 import java.io.IOException
-import kotlin.jvm.Throws
 
 //TODO: Namespace Support
 class XmlReader internal constructor(private val source: BufferedSource) : Closeable {

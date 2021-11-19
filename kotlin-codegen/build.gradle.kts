@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.5.31"
-    kotlin("kapt") version "1.5.31"
+    kotlin("jvm") version "1.6.0"
+    kotlin("kapt") version "1.6.0"
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
@@ -17,8 +17,8 @@ dependencies {
     compileOnly("net.ltgt.gradle.incap:incap:0.3")
     kapt("net.ltgt.gradle.incap:incap-processor:0.3")
 
-    implementation("com.google.auto.service:auto-service:1.0")
-    kapt("com.google.auto.service:auto-service:1.0")
+    implementation("com.google.auto.service:auto-service:1.0.1")
+    kapt("com.google.auto.service:auto-service:1.0.1")
 
     testImplementation("junit:junit:4.13.2")
 }

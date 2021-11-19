@@ -13,30 +13,33 @@ A modern XML library for Java
 - Doesn't support custom entities
 
 ### Parsing into objects
-```java
-String xml = ...;
+```kotlin
+val xml: String = "<text>Hello There</text>"
 
-Parsnip xml = new Parsnip.Builder().build();
-XmlAdapter<BlackjackHand> xmlAdapter = xml.adapter(BlackjackHand.class);
+val parsnip: Parsnip = Parsnip.Builder().build()
+val xmlAdapter: XmlAdapter<BlackjackHand> = parsnip.adapter<BlackjackHand>()
 
-BlackjackHand blackjackHand = xmlAdapter.fromXml(xml);
+val blackjackHand = xmlAdapter.fromJson(json)
+println(blackjackHand)
 ```
 
 ### Serialize objects into xml
-```java
-BlackjackHand blackjackHand = new BlackjackHand(
-    new Card('6', SPADES),
-    Arrays.asList(new Card('4', CLUBS), new Card('A', HEARTS)));
+```kotlin
+val blackjackHand = BlackjackHand(
+    Card('6', SPADES),
+    listOf(Card('4', CLUBS), Card('A', HEARTS))
+  )
 
-Parsnip xml = new Parsnip.Builder().build();
-XmlAdapter<BlackjackHand> xmlAdapter = xml.adapter(BlackjackHand.class);
+val parsnip: Parsnip = Parsnip.Builder().build()
+val xmlAdapter: XmlAdapter<BlackjackHand> = parsnip.adapter<BlackjackHand>()
 
-String xml = xmlAdapter.toXml(blackjackHand);
+val xml: String = xmlAdapter.toJson(blackjackHand)
+println(xml)
 ```
 
 ### Built in xml adapters
 Parsnip has built-in support for reading and writing
-- primative types
+- primitive types
 - arrays, collections and lists
 - Strings
 - enums
@@ -44,21 +47,20 @@ Parsnip has built-in support for reading and writing
 It supports classes by writing them out field-by-field. Primaitves will be written out as attributes by default, classes will be written out as tags.
 
 If you have these classes:
-```java
-class BlackjackHand {
-  public final Card hiddenCard;
-  public final List<Card> visibleCards;
-  ...
-}
 
-class Card {
-  public final char rank;
-  public final Suit suit;
-  ...
-}
+```kotlin
+class BlackjackHand(
+    val hidden_card: Card,
+    val visible_cards: List<Card>,
+)
 
-enum Suit {
-  CLUBS, DIAMONDS, HEARTS, SPADES;
+class Card(
+    val rank: Char,
+    val suit: Suit,
+)
+
+enum class Suit {
+    CLUBS, DIAMONDS, HEARTS, SPADES;
 }
 ```
 
@@ -71,28 +73,6 @@ Parsnip will read and write this xml:
 </BlackjackHand>
 ```
 
-### Custom naming
-You can customzie the names of tags and attributes with `@SerializedName()`. The above example will look a little better as such:
-```java
-class BlackjackHand {
-  @SerializedName("HiddenCard")
-  public final Card hiddenCard;
-  @SerializedName("VisibleCard")
-  public final List<Card> visibleCards;
-  ...
-}
-
-class Card {
-  public final char rank;
-  public final Suit suit;
-  ...
-}
-
-enum Suit {
-  CLUBS, DIAMONDS, HEARTS, SPADES;
-}
-```
-
 ```xml
 <BlackjackHand>
   <HiddenCard rank="6" suit="SPADES"/>
@@ -103,25 +83,26 @@ enum Suit {
 
 ### Text
 You can use the `@Text` annotation to read/write the text of a tag.
-```java
+```kotlin
 class Card {
-  @Text
-  public final char rank;
-  public final Suit suit;
+    @Text
+    var rank: Char
+    var suit: Suit
 }
 ```
+
 ```xml
 <Card suit="SPADES">6</Card>
 ```
 
 ### Tag
 Often times you only care about the contents of a tag, not any of it's attributes. You can save some nesting in your hiarchy with the `@Tag` annotation.
-```java
+```kotlin
 class Card {
   @Tag
-  public final char rank;
+  var rank: Char
   @Tag
-  public final Suit suit;
+  var suit: Suit
 }
 ```
 ```xml
@@ -134,10 +115,10 @@ class Card {
 ### Namespace
 By default, any namespace on an element will be ignored. If you want to enforce a namespace, you can use the `@Namespace` annotation.
 
-```java
+```kotlin
 class Card {
   @Namespace("http://example.com", alias="ns")
-  public final char rank;
+  var rank: Char
 }
 ```
 will read

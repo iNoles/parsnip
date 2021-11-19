@@ -53,7 +53,7 @@ public class TagXmlAdapter<T> extends XmlAdapter<T> {
     }
 
     @Override
-    public T fromXml(XmlReader reader) throws IOException {
+    public T fromXml(XmlReader reader) {
         return converter.from(reader.nextText());
     }
 

@@ -33,7 +33,7 @@ public class SimpleFrameworkSmallXmlBenchmark {
 
     @Root(name = "employee", strict = false)
     public static class Employee {
-        @Element(required = true)
+        @Element()
         public String name;
     }
 }

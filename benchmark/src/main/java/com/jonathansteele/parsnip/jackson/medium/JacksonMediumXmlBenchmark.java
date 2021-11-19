@@ -95,7 +95,7 @@ public class JacksonMediumXmlBenchmark {
     public static class Title {
         public String type;
 
-        @JacksonXmlText(value = true)
+        @JacksonXmlText()
         public String title;
 
         @Override
@@ -107,7 +107,7 @@ public class JacksonMediumXmlBenchmark {
     public static class Summary {
         public String type;
 
-        @JacksonXmlText(value = true)
+        @JacksonXmlText()
         public String summary;
 
         @Override

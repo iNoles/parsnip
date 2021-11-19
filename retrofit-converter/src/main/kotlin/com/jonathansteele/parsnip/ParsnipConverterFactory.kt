@@ -22,6 +22,7 @@ import okhttp3.ResponseBody
 import retrofit2.Converter
 import java.lang.reflect.Type
 
+@Suppress("unused")
 class ParsnipConverterFactory private constructor(private val parsnip: Parsnip) : Converter.Factory() {
     override fun responseBodyConverter(
         type: Type,
