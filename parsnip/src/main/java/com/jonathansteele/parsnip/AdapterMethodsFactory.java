@@ -17,6 +17,7 @@ package com.jonathansteele.parsnip;
 
 import com.jonathansteele.parsnip.annotations.FromXml;
 import com.jonathansteele.parsnip.annotations.ToXml;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -56,7 +57,7 @@ final class AdapterMethodsFactory implements XmlAdapter.Factory {
 
         return new XmlAdapter<Object>() {
             @Override
-            public Object fromXml(XmlReader reader) throws IOException {
+            public Object fromXml(@NotNull XmlReader reader) throws IOException {
                 if (fromAdapter == null) {
                     return delegate.fromXml(reader);
                 } else {
@@ -72,7 +73,7 @@ final class AdapterMethodsFactory implements XmlAdapter.Factory {
             }
 
             @Override
-            public void toXml(XmlWriter writer, Object value) throws IOException {
+            public void toXml(@NotNull XmlWriter writer, Object value) throws IOException {
                 if (toAdapter == null) {
                     delegate.toXml(writer, value);
                 } else {

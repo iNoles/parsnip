@@ -13,14 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.jonathansteele.parsnip.annotations;
+package com.jonathansteele.parsnip
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+/**
+ * Represents an xml namespace.
+ */
+class Namespace(
+    @JvmField var alias: String?,
+    @JvmField var namespace: String?) {
 
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-public @interface FromXml {
+    constructor() : this("", "")
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || javaClass != other.javaClass) return false
+        val namespace1 = other as Namespace
+        return namespace == namespace1.namespace
+    }
+
+    override fun hashCode(): Int = if (namespace != null) namespace.hashCode() else 0
 }

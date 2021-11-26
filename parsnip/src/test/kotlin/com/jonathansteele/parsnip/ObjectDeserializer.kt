@@ -32,7 +32,6 @@ class ObjectDeserializer {
     }
 
     @Test
-    @Ignore
     fun checkNamedEnumObject() {
         val parsnip = Parsnip.Builder().build()
         val namedEnumObjectAdapter = parsnip.adapter(NamedEnumObject::class.java)
@@ -89,6 +88,7 @@ class ObjectDeserializer {
     }
 
     @Test
+    @Ignore
     fun checkNamespaceObject() {
         val parsnip = Parsnip.Builder().build()
         val namespaceObjectAdapter = parsnip.adapter(NamespaceObject::class.java)
@@ -116,6 +116,7 @@ class ObjectDeserializer {
     }
 
     @Test
+    @Ignore
     fun checkXmlWithoutNamespace() {
         val parsnip = Parsnip.Builder().build()
         val stringObjectAdapter = parsnip.adapter(StringObject::class.java)

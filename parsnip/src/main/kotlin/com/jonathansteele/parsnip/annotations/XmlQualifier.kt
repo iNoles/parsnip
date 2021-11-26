@@ -13,26 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.jonathansteele.parsnip.annotations
 
-package com.jonathansteele.parsnip;
-
-/**
- * Created by evan on 6/15/15.
- */
-public class XmlDataException extends RuntimeException {
-    public XmlDataException() {
-        super();
-    }
-
-    public XmlDataException(String message) {
-        super(message);
-    }
-
-    public XmlDataException(Throwable cause) {
-        super(cause);
-    }
-
-    public XmlDataException(String message, Throwable cause) {
-        super(message, cause);
-    }
-}
+/** Annotates another annotation, causing it to specialize how values are encoded and decoded.  */
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+@MustBeDocumented
+annotation class XmlQualifier 

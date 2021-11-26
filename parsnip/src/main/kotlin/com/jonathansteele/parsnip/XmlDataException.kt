@@ -13,16 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.jonathansteele.parsnip
 
-package com.jonathansteele.parsnip.annotations;
+import java.lang.RuntimeException
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-@XmlQualifier
-public @interface Tag {
-}
+/**
+ * Created by evan on 6/15/15.
+ */
+class XmlDataException(message: String) : RuntimeException(message)

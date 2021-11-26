@@ -79,7 +79,9 @@ public class Parsnip {
             if (type == null) throw new IllegalArgumentException("type == null");
             if (xmlAdapter == null) throw new IllegalArgumentException("xmlAdapter == null");
             return add((targetType, annotations, adapters) ->
-                    annotations.isEmpty() && Util.typesMatch(type, targetType) ? xmlAdapter : null);
+                    (annotations != null && annotations.isEmpty()) && Util.typesMatch(type, targetType) ?
+                            xmlAdapter : null
+            );
         }
 
         public <T> Builder add(Type type, Class<? extends Annotation> annotation, XmlAdapter<T> xmlAdapter) {
@@ -92,8 +94,7 @@ public class Parsnip {
             return add((targetType, annotations, adapters) -> {
                 if (!Util.typesMatch(type, targetType)) return null;
                 // TODO: check for an annotations exact match.
-                if (Util.isAnnotationPresent(annotations, annotation))
-                    return null;
+                if (annotations != null && Util.isAnnotationPresent(annotations, annotation)) return null;
                 return xmlAdapter;
             });
         }
@@ -108,7 +109,9 @@ public class Parsnip {
             if (type == null) throw new IllegalArgumentException("type == null");
             if (typeConverter == null) throw new IllegalArgumentException("typeConverter == null");
             return add((targetType, annotations) ->
-                    annotations.isEmpty() && Util.typesMatch(type, targetType) ? typeConverter : null);
+                    (annotations != null && annotations.isEmpty()) && Util.typesMatch(type, targetType) ?
+                            typeConverter : null
+            );
         }
 
         public <T> Builder add(Type type, Class<? extends Annotation> annotation, TypeConverter<T> typeConverter) {
@@ -121,8 +124,7 @@ public class Parsnip {
             return add((targetType, annotations) -> {
                 if (!Util.typesMatch(type, targetType)) return null;
                 // TODO: check for an annotations exact match.
-                if (Util.isAnnotationPresent(annotations, annotation))
-                    return null;
+                if (annotations != null && Util.isAnnotationPresent(annotations, annotation)) return null;
                 return typeConverter;
             });
         }

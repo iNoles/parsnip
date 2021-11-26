@@ -13,13 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.jonathansteele.parsnip.annotations
 
-package com.jonathansteele.parsnip.classes
-
-import com.jonathansteele.parsnip.annotations.Namespace
-
-data class NamespaceObject(
-    @Namespace("foo", "ns") val attribute: String,
-    @Namespace("foo", "ns") val tag: StringObject,
-    @Namespace("foo", "ns") val item: List<StringObject>
-)
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER)
+annotation class FromXml

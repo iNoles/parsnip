@@ -16,6 +16,8 @@
 
 package com.jonathansteele.parsnip;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -131,13 +133,13 @@ public class XmlAdapters {
         }
 
         @Override
-        public T fromXml(XmlReader reader) throws IOException {
+        public T fromXml(@NotNull XmlReader reader) throws IOException {
             if (delegate == null) throw new IllegalStateException("Type adapter isn't ready");
             return delegate.fromXml(reader);
         }
 
         @Override
-        public void toXml(XmlWriter writer, T value) throws IOException {
+        public void toXml(@NotNull XmlWriter writer, T value) throws IOException {
             if (delegate == null) throw new IllegalStateException("Type adapter isn't ready");
             delegate.toXml(writer, value);
         }

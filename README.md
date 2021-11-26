@@ -44,7 +44,7 @@ Parsnip has built-in support for reading and writing
 - Strings
 - enums
 
-It supports classes by writing them out field-by-field. Primaitves will be written out as attributes by default, classes will be written out as tags.
+It supports classes by writing them out field-by-field. Primitives will be written out as attributes by default, classes will be written out as tags.
 
 If you have these classes:
 

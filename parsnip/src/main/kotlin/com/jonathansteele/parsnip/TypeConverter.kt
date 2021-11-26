@@ -13,18 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.jonathansteele.parsnip.annotations;
+package com.jonathansteele.parsnip
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.lang.reflect.Type
 
-import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+interface TypeConverter<T> {
+    fun from(value: String): T
+    fun to(value: T): String
 
-/** Annotates another annotation, causing it to specialize how values are encoded and decoded. */
-@Target(ANNOTATION_TYPE)
-@Retention(RUNTIME)
-@Documented
-public @interface XmlQualifier {
+    fun interface Factory {
+        fun create(type: Type?, annotations: Set<Annotation?>?): TypeConverter<*>?
+    }
 }

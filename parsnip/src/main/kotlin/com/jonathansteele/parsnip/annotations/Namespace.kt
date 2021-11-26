@@ -13,14 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.jonathansteele.parsnip.annotations;
+package com.jonathansteele.parsnip.annotations
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-public @interface ToXml {
-}
+/**
+ * Created by evan on 7/3/15.
+ */
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FIELD)
+annotation class Namespace(val alias: String = "", val value: String)

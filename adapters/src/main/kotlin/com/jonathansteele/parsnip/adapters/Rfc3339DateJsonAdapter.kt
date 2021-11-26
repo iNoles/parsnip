@@ -15,7 +15,7 @@ class Rfc3339DateJsonAdapter : XmlAdapter<Date>() {
         return Iso8601Utils.parse(string)
     }
 
-    override fun toXml(writer: XmlWriter, value: Date?) {
+    override fun toXml(writer: XmlWriter, value: Date) {
         val string = Iso8601Utils.format(value)
         writer.value(string)
     }
