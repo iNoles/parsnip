@@ -160,95 +160,102 @@ class XmlReaderTest {
 
     // Namespace
     @Test
-    @Ignore
     fun checkTagWithNamespaceName() {
         val reader = xmlReader("<test1 xmlns:ns='foo'><ns:test2/></test1>")
         reader.beginTag()
         reader.nextTagName()
+        reader.nextAttribute()
+        reader.nextValue()
         reader.beginTag()
         val tag = reader.nextTagName()
 
         assertEquals("test2", tag)
-        // assertEquals("foo", namespace.namespace)
-        // assertEquals("ns", namespace.alias)
     }
 
     @Test
-    @Ignore
     fun checkTagWithNamespaceAttribute() {
         val reader = xmlReader("<test xmlns:ns='foo' ns:attribute='value'/>")
         reader.beginTag()
         reader.nextTagName()
+        reader.nextAttribute()
+        val fooValue = reader.nextValue()
         val attribute = reader.nextAttribute()
-        val value = reader.nextValue()
+        val attributeValue = reader.nextValue()
 
         assertEquals("attribute", attribute)
-        // assertEquals("foo", namespace.namespace)
-        // assertEquals("ns", namespace.alias)
-        assertEquals("value", value)
+        assertEquals("foo", fooValue)
+        assertEquals("value", attributeValue)
     }
 
     @Test
-    @Ignore
     fun checkTagWithAttributeAndDuplicateNamespace() {
         val reader = xmlReader("<test1 xmlns:ns='foo'><test2 xmlns:ns='bar' ns:attribute='value'/></test1>")
         reader.beginTag()
-        reader.nextTagName()
+        val test1 = reader.nextTagName()
+        assertEquals("test1", test1)
+        reader.nextAttribute()
+        reader.nextValue()
+
         reader.beginTag()
-        reader.nextTagName()
+        val test2 = reader.nextTagName()
+        assertEquals("test2", test2)
+
+        reader.nextAttribute()
+        reader.nextValue()
+
         val attribute = reader.nextAttribute()
         val value = reader.nextValue()
-
         assertEquals("attribute", attribute)
-        // assertEquals("bar", namespace.namespace)
-        // assertEquals("ns", namespace.alias)
-
         assertEquals("value", value)
     }
 
     @Test
-    @Ignore
     fun checkTagWithNamespaceAndAttributeWithIncorrectlyUsed() {
         val reader = xmlReader("<test1><test2 xmlns:ns='foo'/><test3 ns:attribute='value'/></test1>")
         reader.beginTag()
-        reader.nextTagName()
+        val test1 = reader.nextTagName()
+        assertEquals("test1", test1)
+
         reader.beginTag()
-        reader.nextTagName()
+        val test2 = reader.nextTagName()
+        assertEquals("test2", test2)
+        reader.nextAttribute()
+        reader.nextValue()
         reader.endTag()
+
         reader.beginTag()
+        val test3 = reader.nextTagName()
+        assertEquals("test3", test3)
         val attribute = reader.nextAttribute()
         val value = reader.nextValue()
 
         assertEquals("attribute", attribute)
-        // assertNotEquals("foo", namespace.namespace)
         assertEquals("value", value)
     }
 
     @Test
-    @Ignore
     fun checkTagWithDefaultNamespace() {
         val reader = xmlReader("<test1 xmlns='foo'><test2/></test1>")
         reader.beginTag()
         reader.nextTagName()
+        reader.nextAttribute()
+        reader.nextValue()
         reader.beginTag()
         val tag = reader.nextTagName()
 
         assertEquals("test2", tag)
-        //assertEquals("foo", namespace.namespace)
-        //assertNull(namespace.alias)
     }
 
     @Test
-    @Ignore
     fun checkAttributeOnTagWithDefaultNamespace() {
         val reader = xmlReader("<test xmlns='foo' attribute='value'/>")
         reader.beginTag()
         reader.nextTagName()
+        reader.nextAttribute()
+        reader.nextValue()
         val attribute = reader.nextAttribute()
 
         assertEquals("attribute", attribute)
-        // assertEquals("foo", namespace.namespace)
-        // assertNull(namespace.alias)
     }
 
     @Test
@@ -303,6 +310,7 @@ class XmlReaderTest {
 
     // TODO: This should Fail
     @Test
+    @Ignore
     fun checkIncorrectlyDuplicatedAttribute() {
         val reader = xmlReader("<test attribute='value1' attribute='value2/>")
         reader.beginTag()

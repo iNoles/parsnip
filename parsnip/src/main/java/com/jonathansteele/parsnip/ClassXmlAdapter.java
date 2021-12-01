@@ -18,6 +18,7 @@ package com.jonathansteele.parsnip;
 
 import com.jonathansteele.parsnip.annotations.SerializedName;
 import com.jonathansteele.parsnip.annotations.Text;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -239,7 +240,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
     }
 
     @Override
-    public T fromXml(XmlReader reader) throws IOException {
+    public T fromXml(@NotNull XmlReader reader) throws IOException {
         T result;
         try {
             result = classFactory.newInstance();
@@ -313,7 +314,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
     }
 
     @Override
-    public void toXml(XmlWriter writer, T value) throws IOException {
+    public void toXml(@NotNull XmlWriter writer, T value) throws IOException {
         // Write declared namespaces for attributes and tags
         if (declareNamespaces == null) {
             declareNamespaces = initDeclareNamespaces();
