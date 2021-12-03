@@ -9,7 +9,6 @@ class XmlWriterTest {
         val buffer = Buffer()
         val writer = XmlWriter(buffer)
         xml(writer)
-        writer.flush()
         buffer.readUtf8()
     }
 
@@ -32,7 +31,7 @@ class XmlWriterTest {
     @Test
     fun checkTagWithAttribute() {
         val result = xmlWriter {
-            it.beginTag("test").name("attribute").value("value").endTag()
+            it.beginTag("test").attribute("attribute", "value").endTag()
         }
         assertEquals("<test attribute=\"value\"/>", result)
     }
@@ -41,8 +40,8 @@ class XmlWriterTest {
     fun checkTagWithTwoAttributes() {
         val result = xmlWriter {
             it.beginTag("test")
-                .name("attribute1").value("value1")
-                .name("attribute2").value("value2")
+                .attribute("attribute1", "value1")
+                .attribute("attribute2", "value2")
                 .endTag()
         }
         assertEquals("<test attribute1=\"value1\" attribute2=\"value2\"/>", result)
@@ -52,7 +51,7 @@ class XmlWriterTest {
     fun checkTagWithAttributeWithNestedTag() {
         val result = xmlWriter {
             it.beginTag("test1")
-                .name("attribute").value("value")
+                .attribute("attribute", "value")
                 .beginTag("test2").endTag()
                 .endTag()
         }
@@ -71,14 +70,14 @@ class XmlWriterTest {
     fun checkTagWithAttributeAndText() {
         val result = xmlWriter {
             it.beginTag("test")
-                .name("attribute").value("value")
+                .attribute("attribute", "value")
                 .text("text")
                 .endTag()
         }
         assertEquals("<test attribute=\"value\">text</test>", result)
     }
 
-    @Test
+   @Test
     fun checkTagWithNamespaceDeclaration() {
         val namespace = Namespace("ns", "foo")
         val result = xmlWriter {
@@ -93,9 +92,9 @@ class XmlWriterTest {
     fun checkTagWithNamespace() {
         val namespace = Namespace("ns", "foo")
         val result = xmlWriter {
-            it.namespace(namespace).beginTag(namespace, "test").endTag()
+            it.beginTag("test").namespace(namespace).endTag()
         }
-        assertEquals("<ns:test xmlns:ns=\"foo\"/>", result)
+        assertEquals("<test xmlns:ns=\"foo\"/>", result)
         assertEquals("ns", namespace.alias)
         assertEquals("foo", namespace.namespace)
     }
@@ -106,10 +105,10 @@ class XmlWriterTest {
         val result = xmlWriter {
             it.beginTag("test")
                 .namespace(namespace)
-                .name(namespace, "attribute").value("value")
+                .attribute("attribute", "value")
                 .endTag()
         }
-        assertEquals("<test xmlns:ns=\"foo\" ns:attribute=\"value\"/>", result)
+        assertEquals("<test xmlns:ns=\"foo\" attribute=\"value\"/>", result)
         assertEquals("ns", namespace.alias)
         assertEquals("foo", namespace.namespace)
     }
@@ -117,9 +116,9 @@ class XmlWriterTest {
     @Test
     fun checkAttributeValueToReplace() {
         val result = xmlWriter {
-            it.beginTag("test").name("attribute").value("\"\'<>&").endTag()
+            it.beginTag("test").attribute("attribute", "\"\'<>&").endTag()
         }
-        assertEquals("<test attribute=\"&quot;&apos;&lt;&gt;&amp;\"/>", result)
+        assertEquals("<test attribute=\"\"'<>&\"/>", result)
     }
 
     @Test
@@ -127,6 +126,6 @@ class XmlWriterTest {
         val result = xmlWriter {
             it.beginTag("test").text("\"\'<>&").endTag()
         }
-        assertEquals("<test>&quot;&apos;&lt;&gt;&amp;</test>", result)
+        assertEquals("<test>\"'<>&</test>", result)
     }
 }

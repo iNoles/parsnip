@@ -24,7 +24,7 @@ import okio.BufferedSink;
 import okio.ByteString;
 import okio.Sink;
 
-public class XmlWriter implements Closeable, Flushable {
+public class XmlWriter2 implements Closeable, Flushable {
 
     /**
      * Replacements for xml entities that need to be encoded.
@@ -67,7 +67,7 @@ public class XmlWriter implements Closeable, Flushable {
     private char quote = '"';
     private String deferredName;
 
-    public XmlWriter(BufferedSink sink) {
+    public XmlWriter2(BufferedSink sink) {
         if (sink == null) {
             throw new NullPointerException("sink == null");
         }
@@ -109,7 +109,7 @@ public class XmlWriter implements Closeable, Flushable {
      * @param name the name of the tag, must not be null.
      * @return this writer.
      */
-    public XmlWriter beginTag(String name) throws IOException {
+    public XmlWriter2 beginTag(String name) throws IOException {
         return beginTag(null, name);
     }
 
@@ -122,7 +122,7 @@ public class XmlWriter implements Closeable, Flushable {
      * @param name      the name of the tag, must not be null.
      * @return this writer.
      */
-    public XmlWriter beginTag(Namespace namespace, String name) throws IOException {
+    public XmlWriter2 beginTag(Namespace namespace, String name) throws IOException {
         String fullName = namespace != null ? namespace.alias + ":" + name : name;
         afterBeginTag();
         state = STATE_TAG;
@@ -143,7 +143,7 @@ public class XmlWriter implements Closeable, Flushable {
      *
      * @return this writer.
      */
-    public XmlWriter endTag() throws IOException {
+    public XmlWriter2 endTag() throws IOException {
         stackSize--;
         // If where are on the same tag and no text has been written, self-close. Otherwise, write a closing tag.
         String pathName = pathNames[stackSize];
@@ -166,7 +166,7 @@ public class XmlWriter implements Closeable, Flushable {
      * @param name the name of the attribute, must not be null.
      * @return this writer.
      */
-    public XmlWriter name(String name) throws IOException {
+    public XmlWriter2 name(String name) throws IOException {
         return name(null, name);
     }
 
@@ -179,7 +179,7 @@ public class XmlWriter implements Closeable, Flushable {
      * @param name      the name of the attribute, must not be null.
      * @return this writer.
      */
-    public XmlWriter name(Namespace namespace, String name) throws IOException {
+    public XmlWriter2 name(Namespace namespace, String name) throws IOException {
         if (state != STATE_TAG) {
             throw new IllegalStateException();
         }
@@ -203,7 +203,7 @@ public class XmlWriter implements Closeable, Flushable {
      * @param value the value of the attribute, if this is null the attribute will be skipped.
      * @return this writer.
      */
-    public XmlWriter value(String value) throws IOException {
+    public XmlWriter2 value(String value) throws IOException {
         if (state != STATE_ATTRIBUTE) {
             throw new IllegalStateException();
         }
@@ -226,7 +226,7 @@ public class XmlWriter implements Closeable, Flushable {
      * @param text the tag text.
      * @return this writer.
      */
-    public XmlWriter text(String text) throws IOException {
+    public XmlWriter2 text(String text) throws IOException {
         if (state == STATE_BEFORE_DOCUMENT || state == STATE_ATTRIBUTE) {
             throw new IllegalStateException();
         }
@@ -246,7 +246,7 @@ public class XmlWriter implements Closeable, Flushable {
      *                  to use the same one multiple times to reduce allocations.
      * @return this writer.
      */
-    public XmlWriter namespace(Namespace namespace) throws IOException {
+    public XmlWriter2 namespace(Namespace namespace) throws IOException {
         if (state == STATE_TAG) {
             declareNamespace(namespace);
         } else if (state == STATE_BEFORE_DOCUMENT || state == STATE_AFTER_TAG) {

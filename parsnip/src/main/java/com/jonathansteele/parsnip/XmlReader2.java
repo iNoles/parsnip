@@ -25,7 +25,7 @@ import okio.Buffer;
 import okio.BufferedSource;
 import okio.ByteString;
 
-public class XmlReader3 implements Closeable {
+public class XmlReader2 implements Closeable {
     private static final ByteString TAG_START_TERMINALS = ByteString.encodeUtf8(">/ \n\t\r\f");
     private static final ByteString TEXT_END_TERMINAL = ByteString.encodeUtf8("&<");
     private static final ByteString ATTRIBUTE_END_TERMINAL = ByteString.encodeUtf8("= ");
@@ -94,7 +94,7 @@ public class XmlReader3 implements Closeable {
     private String lastAttribute = null;
     private final Namespace tempNamespace = new Namespace();
 
-    public XmlReader3(BufferedSource source) {
+    public XmlReader2(BufferedSource source) {
         if (source == null) {
             throw new IllegalArgumentException("source == null");
         }
