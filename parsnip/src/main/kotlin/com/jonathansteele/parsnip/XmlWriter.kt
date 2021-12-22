@@ -25,6 +25,7 @@ class XmlWriter(private val sink: BufferedSink): Closeable {
 
     private var pathNames = arrayOfNulls<String>(32)
     private var pathIndices = IntArray(32)
+    private var deferredName: String? = null
 
     init {
         stack[stackSize++] = XmlScope.EMPTY_DOCUMENT
@@ -96,40 +97,42 @@ class XmlWriter(private val sink: BufferedSink): Closeable {
         )
     }
 
+    fun beginTag(elementTagName: String): XmlWriter = beginTag(null, elementTagName)
+
     /**
      * Begin a new xml tag. Must be closed with [endTag]
      *
-     * @param elementTagName The name of the xml element tag
-     * @throws IOException
+     * @param name The name of the xml element tag
      */
-    fun beginTag(elementTagName: String): XmlWriter {
+    fun beginTag(namespace: Namespace?, name: String): XmlWriter {
+        val fullName = namespace?.let { "${it.alias}:$name"  } ?: name
         when (peekStack()) {
             XmlScope.EMPTY_DOCUMENT -> {
                 replaceTopOfStack(NONEMPTY_DOCUMENT)
                 pushStack(ELEMENT_OPENING)
-                pathNames[stackSize - 1] = elementTagName
+                pathNames[stackSize - 1] = fullName
                 sink.writeByte(OPENING_XML_ELEMENT.toInt())
-                    .writeUtf8(elementTagName)
+                    .writeUtf8(fullName)
             }
             ELEMENT_CONTENT -> {
                 pushStack(ELEMENT_OPENING)
-                pathNames[stackSize - 1] = elementTagName
+                pathNames[stackSize - 1] = fullName
                 sink.writeByte(OPENING_XML_ELEMENT.toInt())
-                    .writeUtf8(elementTagName)
+                    .writeUtf8(fullName)
             }
             ELEMENT_OPENING -> {
                 replaceTopOfStack(ELEMENT_CONTENT)
                 pushStack(ELEMENT_OPENING)
-                pathNames[stackSize - 1] = elementTagName
+                pathNames[stackSize - 1] = fullName
                 sink.writeByte(CLOSING_XML_ELEMENT.toInt())
                     .writeByte(OPENING_XML_ELEMENT.toInt())
-                    .writeUtf8(elementTagName)
+                    .writeUtf8(fullName)
             }
             NONEMPTY_DOCUMENT -> throw IOException(
                 "A xml document can only have one root xml element. There is already one but you try to add another" +
-                        " one < $elementTagName >"
+                        " one < $fullName >"
             )
-            else -> throw syntaxError("Unexpected begin of a new xml element < $elementTagName >. " +
+            else -> throw syntaxError("Unexpected begin of a new xml element < $fullName >. " +
                     "New xml elements can only begin on a empty document or in a text content but tried to insert " +
                     "an element on scope " + getTopStackElementAsToken(stackSize, stack)
             )
@@ -197,38 +200,40 @@ class XmlWriter(private val sink: BufferedSink): Closeable {
         return this
     }
 
+    fun name(name: String): XmlWriter = name(null, name)
+
+    fun name(namespace: Namespace?, name: String): XmlWriter {
+        deferredName = namespace?.let { "${it.alias}:$name"  } ?: name
+        return this
+    }
+
     /**
      * Writes a xml attribute and the corresponding value.
      * Must be called after [beginTag] and before [endTag] or [text]
      *
-     * @param attributeName The name of the attribute
      * @param value the value
      */
-    fun attribute(attributeName: String, value: String): XmlWriter {
+    fun value(value: String?): XmlWriter {
+        if (value == null) {
+            // skip this name and value
+            deferredName = null
+            return this
+        }
         if (ELEMENT_OPENING == peekStack()) {
             sink.writeByte(' '.code) // Write a whitespace
-                .writeUtf8(attributeName)
+                .writeUtf8(deferredName!!)
                 .write(ATTRIBUTE_ASSIGNMENT_BEGIN)
                 .writeUtf8(value)
                 .writeByte(DOUBLE_QUOTE.toInt())
-        } else {
-            throw syntaxError(
-                "Error while trying to write attribute "
-                        + attributeName
-                        + "=\""
-                        + value
-                        + "\". Attributes can only be written in a opening xml element but was in xml scope "
-                        + getTopStackElementAsToken(stackSize, stack)
-            )
         }
         return this
     }
 
     fun namespace(namespace: Namespace) : XmlWriter {
         return if (!namespace.alias.isNullOrEmpty()) {
-            attribute("xmlns:" + namespace.alias, namespace.namespace!!)
+            name("xmlns:" + namespace.alias).value(namespace.namespace!!)
         } else {
-            attribute("xmlns", namespace.namespace!!)
+            name("xmlns").value(namespace.namespace!!)
         }
     }
 }

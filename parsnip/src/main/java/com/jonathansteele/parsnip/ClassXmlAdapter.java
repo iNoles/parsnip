@@ -447,7 +447,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         }
 
         @Override
-        void writeValue(XmlWriter writer, T value) throws IOException {
+        void writeValue(XmlWriter writer, T value) {
             if (namespace == null) {
                 writer.name(name);
             } else {
@@ -471,7 +471,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
         }
 
         @Override
-        void writeValue(XmlWriter writer, T value) throws IOException {
+        void writeValue(XmlWriter writer, T value) {
             writer.text(converter.to(value));
         }
     }
