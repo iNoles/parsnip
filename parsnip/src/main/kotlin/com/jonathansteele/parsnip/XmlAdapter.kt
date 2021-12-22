@@ -56,6 +56,6 @@ abstract class XmlAdapter<T> {
     }
 
     fun interface Factory {
-        fun create(type: Type?, annotations: Set<Annotation?>?, adapters: XmlAdapters?): XmlAdapter<*>?
+        fun create(type: Type, annotations: Set<Annotation>, adapters: XmlAdapters): XmlAdapter<*>?
     }
 }

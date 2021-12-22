@@ -36,17 +36,17 @@ class TagXmlAdapter<T>(private val converter: TypeConverter<T>) : XmlAdapter<T>(
 
     companion object {
         @JvmField
-        val FACTORY = Factory { type: Type?, annotations: Set<Annotation?>?, adapters: XmlAdapters? ->
-            if (Util.isAnnotationPresent(annotations, Tag::class.java)) {
+        val FACTORY = Factory { type: Type, annotations: Set<Annotation>, adapters: XmlAdapters ->
+            if (annotations.isAnnotationPresent(Tag::class.java)) {
                 return@Factory null
             }
             val restOfAnnotations: MutableSet<Annotation?> = LinkedHashSet()
-            annotations?.forEach { annotation ->
+            annotations.forEach { annotation ->
                 if (annotation !is Tag) {
                     restOfAnnotations.add(annotation)
                 }
             }
-            val converter = adapters?.converter<Any>(type, restOfAnnotations)
+            val converter = adapters.converter<Any>(type, restOfAnnotations)
                 ?: throw IllegalArgumentException("No TypeConverter for type $type and annotations $restOfAnnotations")
             TagXmlAdapter(converter)
         }

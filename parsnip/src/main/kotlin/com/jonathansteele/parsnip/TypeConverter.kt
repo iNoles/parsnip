@@ -22,6 +22,6 @@ interface TypeConverter<T> {
     fun to(value: T): String
 
     fun interface Factory {
-        fun create(type: Type?, annotations: Set<Annotation?>?): TypeConverter<*>?
+        fun create(type: Type, annotations: Set<Annotation>): TypeConverter<*>?
     }
 }
