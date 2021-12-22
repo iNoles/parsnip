@@ -37,7 +37,7 @@ class TagXmlAdapter<T>(private val converter: TypeConverter<T>) : XmlAdapter<T>(
     companion object {
         @JvmField
         val FACTORY = Factory { type: Type?, annotations: Set<Annotation?>?, adapters: XmlAdapters? ->
-            if (annotations?.isAnnotationPresent(Tag::class.java) == true) {
+            if (Util.isAnnotationPresent(annotations, Tag::class.java)) {
                 return@Factory null
             }
             val restOfAnnotations: MutableSet<Annotation?> = LinkedHashSet()

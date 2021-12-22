@@ -142,7 +142,7 @@ final class AdapterMethodsFactory implements XmlAdapter.Factory {
                 && returnType == void.class) {
             // public void pointToXml(XmlWriter writer, Point point) throws Exception {
             Set<? extends Annotation> parameterAnnotations
-                    = Util.getXmlAnnotations(method.getParameterAnnotations()[1]);
+                    = Util.xmlAnnotations(method.getParameterAnnotations()[1]);
             return new AdapterMethod(parameterTypes[1], parameterAnnotations, adapter, method, false) {
                 @Override
                 public void toXml(XmlAdapters adapters, XmlWriter writer, Object value)
@@ -153,11 +153,11 @@ final class AdapterMethodsFactory implements XmlAdapter.Factory {
 
         } else if (parameterTypes.length == 1 && returnType != void.class) {
             // public List<Integer> pointToXml(Point point) throws Exception {
-            final Set<? extends Annotation> returnTypeAnnotations = Util.getXmlAnnotations(method);
+            final Set<? extends Annotation> returnTypeAnnotations = Util.xmlAnnotations(method);
             Annotation[][] parameterAnnotations = method.getParameterAnnotations();
             Set<? extends Annotation> qualifierAnnotations =
-                    Util.getXmlAnnotations(parameterAnnotations[0]);
-            boolean nullable = Util.getHasNullable(parameterAnnotations[0]);
+                    Util.xmlAnnotations(parameterAnnotations[0]);
+            boolean nullable = Util.hasNullable(parameterAnnotations[0]);
             return new AdapterMethod(parameterTypes[0], qualifierAnnotations, adapter, method, nullable) {
                 @Override
                 public void toXml(XmlAdapters adapters, XmlWriter writer, Object value)
@@ -192,7 +192,7 @@ final class AdapterMethodsFactory implements XmlAdapter.Factory {
                 && parameterTypes[0] == XmlReader.class
                 && returnType != void.class) {
             // public Point pointFromXml(XmlReader xmlReader) throws Exception {
-            Set<? extends Annotation> returnTypeAnnotations = Util.getXmlAnnotations(method);
+            Set<? extends Annotation> returnTypeAnnotations = Util.xmlAnnotations(method);
             return new AdapterMethod(returnType, returnTypeAnnotations, adapter, method, false) {
                 @Override
                 public Object fromXml(XmlAdapters adapters, XmlReader reader)
@@ -203,11 +203,11 @@ final class AdapterMethodsFactory implements XmlAdapter.Factory {
 
         } else if (parameterTypes.length == 1 && returnType != void.class) {
             // public Point pointFromXml(List<Integer> o) throws Exception {
-            Set<? extends Annotation> returnTypeAnnotations = Util.getXmlAnnotations(method);
+            Set<? extends Annotation> returnTypeAnnotations = Util.xmlAnnotations(method);
             Annotation[][] parameterAnnotations = method.getParameterAnnotations();
             final Set<? extends Annotation> qualifierAnnotations
-                    = Util.getXmlAnnotations(parameterAnnotations[0]);
-            boolean nullable = Util.getHasNullable(parameterAnnotations[0]);
+                    = Util.xmlAnnotations(parameterAnnotations[0]);
+            boolean nullable = Util.hasNullable(parameterAnnotations[0]);
             return new AdapterMethod(returnType, returnTypeAnnotations, adapter, method, nullable) {
                 @Override
                 public Object fromXml(XmlAdapters adapters, XmlReader reader)

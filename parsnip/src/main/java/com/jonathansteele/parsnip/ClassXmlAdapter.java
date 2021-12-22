@@ -81,7 +81,7 @@ final class ClassXmlAdapter<T> extends XmlAdapter<T> {
                 field.setAccessible(true);
                 // Look up a type adapter for this type.
                 Type fieldType = Types.resolve(type, rawType, field.getGenericType());
-                Set<? extends Annotation> annotations = Util.getXmlAnnotations(field);
+                Set<? extends Annotation> annotations = Util.xmlAnnotations(field);
 
                 // Create the binding between field and Xml.
                 Class<?> rawFieldType = Types.getRawType(fieldType);
