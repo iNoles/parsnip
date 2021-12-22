@@ -15,20 +15,16 @@
  * limitations under the License.
  *
  */
+package com.jonathansteele.parsnip
 
-package com.jonathansteele.parsnip.tikxml.small;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper
 
-import com.tickaroo.tikxml.TikXml;
-import java.io.IOException;
-import okio.Buffer;
+fun parseJacksonXml(xml: String?) {
+    val mapper = XmlMapper()
+    val employee = mapper.readValue(xml, JacksonEmployee::class.java)
+    println("Jackson " + employee.name)
+}
 
-/**
- * @author Hannes Dorfmann
- */
-public class TikXmlSmallXmlBenchmark {
-    public void parse (String xml) throws IOException {
-        TikXml tikXml = new TikXml.Builder().exceptionOnUnreadXml(false).build();
-        Employee employee = tikXml.read(new Buffer().writeUtf8(xml), Employee.class);
-        System.out.println(getClass().getSimpleName() + " " + employee.name);
-    }
+class JacksonEmployee {
+    var name: String? = null
 }

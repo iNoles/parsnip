@@ -15,20 +15,14 @@
  * limitations under the License.
  *
  */
+package com.jonathansteele.parsnip.tikxml.small
 
-package com.jonathansteele.parsnip.jackson.small;
+import com.tickaroo.tikxml.annotation.Xml
+import com.tickaroo.tikxml.annotation.PropertyElement
 
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-
-public class JacksonSmallXmlBenchmark {
-
-    public void parse(String xml) throws Exception {
-        XmlMapper mapper = new XmlMapper();
-        Employee employee = mapper.readValue(xml, Employee.class);
-        System.out.println(getClass().getSimpleName() + " " + employee.name);
-    }
-
-    public static class Employee {
-        public String name;
-    }
-}
+@Xml
+data class Employee(
+    @JvmField
+    @PropertyElement
+    var name: String? = null
+)

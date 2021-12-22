@@ -15,20 +15,23 @@
  * limitations under the License.
  *
  */
+package com.jonathansteele.parsnip
 
-package com.jonathansteele.parsnip.tikxml.medium;
+import org.simpleframework.xml.Element
+import org.simpleframework.xml.core.Persister
+import org.simpleframework.xml.Root
+import org.simpleframework.xml.Serializer
 
-import com.tickaroo.tikxml.TikXml;
-import java.io.IOException;
-import okio.Buffer;
+fun parseSimpleFrameworkXml(xml: String?) {
+    val serializer: Serializer = Persister()
+    val employee = serializer.read(
+        SimpleFrameworkEmployee::class.java, xml
+    )
+    println("Simple Framework " + employee.name)
+}
 
-/**
- * @author Hannes Dorfmann
- */
-public class TikXmlMediumXmlBenchmark {
-    public void parse (String xml) throws IOException {
-        TikXml tikXml = new TikXml.Builder().exceptionOnUnreadXml(false).build();
-        Feed employee = tikXml.read(new Buffer().writeUtf8(xml), Feed.class);
-        System.out.println(getClass().getSimpleName() + " " + employee);
-    }
+@Root(name = "employee", strict = false)
+class SimpleFrameworkEmployee {
+    @Element
+    var name: String? = null
 }

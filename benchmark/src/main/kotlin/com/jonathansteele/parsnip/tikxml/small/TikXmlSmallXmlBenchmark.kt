@@ -15,30 +15,20 @@
  * limitations under the License.
  *
  */
+package com.jonathansteele.parsnip.tikxml.small
 
-package com.jonathansteele.parsnip.tikxml.medium;
+import com.tickaroo.tikxml.TikXml
+import okio.Buffer
 
-import com.tickaroo.tikxml.annotation.Attribute;
-import com.tickaroo.tikxml.annotation.Xml;
-
-@Xml
-public class Link {
-    @Attribute
-    public String href;
-    @Attribute
-    public String title;
-    @Attribute
-    public String rel;
-    @Attribute
-    public String type;
-
-    @Override
-    public String toString() {
-        return "Link{" +
-                "url='" + href + '\'' +
-                ", title='" + title + '\'' +
-                ", rel='" + rel + '\'' +
-                ", type='" + type + '\'' +
-                '}';
-    }
+/**
+ * @author Hannes Dorfmann
+ */
+fun parseTikXml(xml: String?) {
+    val tikXml = TikXml.Builder().exceptionOnUnreadXml(false).build()
+    val employee = tikXml.read(
+        Buffer().writeUtf8(
+            xml!!
+        ), Employee::class.java
+    )
+    println("TikXml " + employee.name)
 }
