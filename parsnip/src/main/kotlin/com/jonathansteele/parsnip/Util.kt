@@ -20,6 +20,7 @@ val Array<Annotation>.xmlAnnotations: Set<Annotation>
 get() {
     var result: MutableSet<Annotation>? = null
     for (annotation in this) {
+        @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
         if ((annotation as java.lang.annotation.Annotation).annotationType()
                 .isAnnotationPresent(XmlQualifier::class.java)) {
             if (result == null) result = LinkedHashSet()
