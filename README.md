@@ -19,7 +19,7 @@ val xml: String = "<text>Hello There</text>"
 val parsnip: Parsnip = Parsnip.Builder().build()
 val xmlAdapter: XmlAdapter<BlackjackHand> = parsnip.adapter<BlackjackHand>()
 
-val blackjackHand = xmlAdapter.fromJson(json)
+val blackjackHand = xmlAdapter.fromJson(xml)
 println(blackjackHand)
 ```
 
