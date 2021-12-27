@@ -1,5 +1,5 @@
 # parsnip
-A modern XML library for Android and Java
+A modern XML library for Kotlin and Java
 
 **Warning!** The parser is quite buggy at the moment and only works with the simplest of xml. 
 
