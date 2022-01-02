@@ -148,12 +148,8 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                             throw syntaxError("Missing closing '>' character in </" + pathNames[stackSize - 1])
                         }
                     } else {
-                        throw syntaxError(
-                            "Expected a closing element tag </"
-                                    + pathNames[stackSize - 1]
-                                    + "> but found </"
-                                    + closingElementName
-                                    + ">"
+                        throw syntaxError("Expected a closing element tag </ ${pathNames[stackSize - 1]}>" +
+                                " but found </ $closingElementName >"
                         )
                     }
                 }
@@ -256,9 +252,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
             throw XmlDataException(
                 "Expected xml element attribute value (in double quotes or single quotes) but was "
                         + peek()
-                        + " at path "
-                        + path
-            )
+                        + " at path $path")
         }
     }
 
@@ -294,43 +288,41 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      *
      * @return The xml element's text content
      */
-    fun nextText(): String {
-        return when (peekIfNone()) {
-            PEEKED_TEXT -> {
-                peeked = PEEKED_NONE
+    fun nextText(): String = when (peekIfNone()) {
+        PEEKED_TEXT -> {
+            peeked = PEEKED_NONE
 
-                // Read text until '<' found
-                val index = source.indexOf(OPENING_XML_ELEMENT)
-                if (index == -1L) {
-                    throw syntaxError(
-                        "Unterminated element text content. Expected </"
-                                + pathNames[stackSize - 1]
-                                + "> but haven't found"
-                    )
-                }
-                buffer.readUtf8(index)
-            }
-            PEEKED_CDATA -> {
-                peeked = PEEKED_NONE
-
-                // Search index of closing CDATA tag ]]>
-                val index = indexOfClosingCDATA()
-                val result = buffer.readUtf8(index)
-                buffer.skip(3) // consume ]]>
-                result
-            }
-            PEEKED_END_TAG -> {
-                // this is an element without any text content. i.e. <foo></foo>.
-                // In that case we return the default value of a string which is the empty string
-                // Don't do peeked = PEEKED_NONE; because that would consume the end tag, which we haven't done yet.
-                ""
-            }
-            else -> {
-                throw XmlDataException(
-                    "Expected xml element text content but was " + peek()
-                            + " at path " + path
+            // Read text until '<' found
+            val index = source.indexOf(OPENING_XML_ELEMENT)
+            if (index == -1L) {
+                throw syntaxError(
+                    "Unterminated element text content. Expected </"
+                            + pathNames[stackSize - 1]
+                            + "> but haven't found"
                 )
             }
+            buffer.readUtf8(index)
+        }
+        PEEKED_CDATA -> {
+            peeked = PEEKED_NONE
+
+            // Search index of closing CDATA tag ]]>
+            val index = indexOfClosingCDATA()
+            val result = buffer.readUtf8(index)
+            buffer.skip(3) // consume ]]>
+            result
+        }
+        PEEKED_END_TAG -> {
+            // this is an element without any text content. i.e. <foo></foo>.
+            // In that case we return the default value of a string which is the empty string
+            // Don't do peeked = PEEKED_NONE; because that would consume the end tag, which we haven't done yet.
+            ""
+        }
+        else -> {
+            throw XmlDataException(
+                "Expected xml element text content but was " + peek()
+                        + " at path " + path
+            )
         }
     }
 
@@ -462,7 +454,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                 if (peekStack == XmlScope.NONEMPTY_DOCUMENT && isDocTypeDefinition) {
                     var index = source.indexOf(CLOSING_XML_ELEMENT, DOCTYPE_OPEN.size.toLong())
                     if (index == -1L) {
-                        throw syntaxError("Unterminated <!DOCTYPE> . Inline DOCTYPE is not support at the moment.")
+                        throw syntaxError("Unterminated <!DOCTYPE>. Inline DOCTYPE is not support at the moment.")
                     }
                     // check if doctype uses brackets
                     val bracketIndex = source.indexOf(OPENING_DOCTYPE_BRACKET, DOCTYPE_OPEN.size.toLong(), index)

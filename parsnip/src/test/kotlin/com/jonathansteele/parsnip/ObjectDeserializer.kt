@@ -2,7 +2,6 @@ package com.jonathansteele.parsnip
 
 import com.jonathansteele.parsnip.classes.*
 import org.junit.Assert
-import org.junit.Ignore
 import org.junit.Test
 
 class ObjectDeserializer {
@@ -88,7 +87,6 @@ class ObjectDeserializer {
     }
 
     @Test
-    @Ignore
     fun checkNamespaceObject() {
         val parsnip = Parsnip.Builder().build()
         val namespaceObjectAdapter = parsnip.adapter(NamespaceObject::class.java)
@@ -116,7 +114,6 @@ class ObjectDeserializer {
     }
 
     @Test
-    @Ignore
     fun checkXmlWithoutNamespace() {
         val parsnip = Parsnip.Builder().build()
         val stringObjectAdapter = parsnip.adapter(StringObject::class.java)
