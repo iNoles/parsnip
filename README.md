@@ -1,5 +1,5 @@
 # parsnip
-A modern XML library for Java
+A modern XML library for Kotlin and Java
 
 **Warning!** The parser is quite buggy at the moment and only works with the simplest of xml. 
 
@@ -19,7 +19,7 @@ val xml: String = "<text>Hello There</text>"
 val parsnip: Parsnip = Parsnip.Builder().build()
 val xmlAdapter: XmlAdapter<BlackjackHand> = parsnip.adapter<BlackjackHand>()
 
-val blackjackHand = xmlAdapter.fromJson(json)
+val blackjackHand = xmlAdapter.fromJson(xml)
 println(blackjackHand)
 ```
 
