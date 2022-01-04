@@ -250,9 +250,8 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
             attributeValue
         } else {
             throw XmlDataException(
-                "Expected xml element attribute value (in double quotes or single quotes) but was "
-                        + peek()
-                        + " at path $path")
+                "Expected xml element attribute value (in double quotes or single quotes) but was ${peek()}" +
+                        " at path $path")
         }
     }
 
@@ -268,10 +267,8 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
             skipQuotedValue(if (p == PEEKED_DOUBLE_QUOTED) DOUBLE_QUOTE else SINGLE_QUOTE)
         } else {
             throw XmlDataException(
-                "Expected xml element attribute value (in double quotes or single quotes) but was "
-                        + peek()
-                        + " at path "
-                        + path
+                "Expected xml element attribute value (in double quotes or single quotes) but was ${peek()} " +
+                        "at path $path"
             )
         }
     }
@@ -296,9 +293,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
             val index = source.indexOf(OPENING_XML_ELEMENT)
             if (index == -1L) {
                 throw syntaxError(
-                    "Unterminated element text content. Expected </"
-                            + pathNames[stackSize - 1]
-                            + "> but haven't found"
+                    "Unterminated element text content. Expected </ ${pathNames[stackSize - 1]} > but haven't found"
                 )
             }
             buffer.readUtf8(index)
@@ -320,8 +315,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         }
         else -> {
             throw XmlDataException(
-                "Expected xml element text content but was " + peek()
-                        + " at path " + path
+                "Expected xml element text content but was ${peek()} at path $path"
             )
         }
     }
@@ -352,9 +346,8 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                 val index = source.indexOf(OPENING_XML_ELEMENT)
                 if (index == -1L) {
                     throw syntaxError(
-                        "Unterminated element text content. Expected </"
-                                + pathNames[stackSize - 1]
-                                + "> but haven't found"
+                        "Unterminated element text content. Expected </ ${pathNames[stackSize - 1]} >" +
+                                " but haven't found"
                     )
                 }
                 buffer.skip(index)
@@ -366,10 +359,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                 buffer.skip(index + 3) // +3 because of consuming closing tag
             }
             else -> {
-                throw XmlDataException(
-                    "Expected xml element text content but was " + peek()
-                            + " at path " + path
-                )
+                throw XmlDataException("Expected xml element text content but was ${peek()} at path $path")
             }
         }
     }
@@ -726,13 +716,13 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     companion object {
-        private val UNQUOTED_STRING_TERMINALS: ByteString = " >/=\n".encodeUtf8()
-        private val CDATA_CLOSE: ByteString = "]]>".encodeUtf8()
-        private val CDATA_OPEN: ByteString = "<![CDATA[".encodeUtf8()
-        private val DOCTYPE_OPEN: ByteString = "<!DOCTYPE".encodeUtf8()
-        private val COMMENT_CLOSE: ByteString = "-->".encodeUtf8()
-        private val XML_DECLARATION_CLOSE: ByteString = "?>".encodeUtf8()
-        private val UTF8_BOM: ByteString = ByteString.of(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+        private val UNQUOTED_STRING_TERMINALS = " >/=\n".encodeUtf8()
+        private val CDATA_CLOSE = "]]>".encodeUtf8()
+        private val CDATA_OPEN = "<![CDATA[".encodeUtf8()
+        private val DOCTYPE_OPEN = "<!DOCTYPE".encodeUtf8()
+        private val COMMENT_CLOSE = "-->".encodeUtf8()
+        private val XML_DECLARATION_CLOSE = "?>".encodeUtf8()
+        private val UTF8_BOM = ByteString.of(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
         private const val DOUBLE_QUOTE = '"'.code.toByte()
         private const val SINGLE_QUOTE = '\''.code.toByte()
         private const val OPENING_XML_ELEMENT = '<'.code.toByte()
