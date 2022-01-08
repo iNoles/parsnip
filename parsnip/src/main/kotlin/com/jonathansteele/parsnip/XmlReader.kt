@@ -7,6 +7,7 @@ import okio.ByteString.Companion.encodeUtf8
 import java.io.Closeable
 import java.io.EOFException
 import java.io.IOException
+import java.util.*
 
 //TODO: Namespace Support
 class XmlReader internal constructor(private val source: BufferedSource) : Closeable {
@@ -14,6 +15,25 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     private var peeked = PEEKED_NONE
     private var pathNames = arrayOfNulls<String>(32)
     private var pathIndices = IntArray(32)
+
+    // Array of namespace keys (think 'foo' in 'xmlns:foo="bar"') sorted for quick binary search.
+    private var namespaceKeys = arrayOfNulls<String>(4)
+
+    // Array of namespace values (think 'bar' in 'xmlns:foo="bar"') sorted to match indices of keys.
+    private var namespaceValues = arrayOfNulls<String>(4)
+
+    // Array of position in the stack for the namespace, used to remove them when the stack is popped.
+    private var namespaceStackPositions = IntArray(4)
+
+    // Array of default namespaces (or null if there is one) for the given position in the stack.
+    private var defaultNamespaces = arrayOfNulls<String>(32)
+
+    // Shadowing a namespace is not likely to happen in practice, but it could, so we need to handle it.
+    // Luckily we don't have to be as fast. The first index is the depth in the stack (stackSize) and the
+    // second an index matching namespaceKeys. We want to lazily create this one because it's probably
+    // not going to be used.
+    private var shadowedNamespaces: Array<Array<String?>?>? = null
+    private var namespaceSize = 0
 
     private var stack = IntArray(32)
     private var stackSize = 0
@@ -377,10 +397,21 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
             System.arraycopy(stack, 0, newStack, 0, stackSize)
             System.arraycopy(pathIndices, 0, newPathIndices, 0, stackSize)
             System.arraycopy(pathNames, 0, newPathNames, 0, stackSize)
+
+            if (shadowedNamespaces != null) {
+                val newShadowedNamespaces = arrayOfNulls<Array<String?>?>(stackSize * 2)
+                System.arraycopy(shadowedNamespaces!!, 0, newShadowedNamespaces, 0, stackSize)
+                shadowedNamespaces = newShadowedNamespaces
+            }
+            val newDefaultNamespaces = arrayOfNulls<String>(stackSize * 2)
+            System.arraycopy(defaultNamespaces, 0, newDefaultNamespaces, 0, stackSize)
+            defaultNamespaces = newDefaultNamespaces
+
             stack = newStack
             pathIndices = newPathIndices
             pathNames = newPathNames
         }
+        defaultNamespaces[stackSize] = defaultNamespaces[stackSize - 1]
         stack[stackSize++] = newTop
     }
 
@@ -392,6 +423,116 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         stackSize--
         pathNames[stackSize] = null // Free the last path name so that it can be garbage collected!
         pathIndices[stackSize - 1]++
+        if (stackSize > 1) {
+            var namespaceSize = namespaceSize
+            var removeCount = 0
+            for (i in namespaceSize - 1 downTo 0) {
+                if (stackSize < namespaceStackPositions[i]) {
+                    namespaceSize--
+                    removeCount++
+                    val len = namespaceSize
+                    if (len > 0) {
+                        System.arraycopy(namespaceStackPositions, i, namespaceStackPositions, i - 1, len)
+                        System.arraycopy(namespaceKeys, i, namespaceKeys, i - 1, len)
+                        System.arraycopy(namespaceValues, i, namespaceValues, i - 1, len)
+                    }
+                }
+            }
+            this.namespaceSize -= removeCount
+            defaultNamespaces[stackSize] = null
+        }
+        if (shadowedNamespaces != null) {
+            val indexesForStack = shadowedNamespaces!![stackSize]
+            for (i in indexesForStack!!.indices) {
+                val value = indexesForStack[i] ?: continue
+                namespaceValues[i] = value
+            }
+            shadowedNamespaces!![stackSize] = null
+        }
+    }
+
+    private fun insertNamespace(key: String, value: String) {
+        val namespaceSize = namespaceSize
+        val searchIndex = Arrays.binarySearch(namespaceKeys, 0, namespaceSize, key)
+        val insertIndex: Int
+        if (searchIndex >= 0) {
+            insertIndex = searchIndex
+            if (shadowedNamespaces == null) {
+                shadowedNamespaces = arrayOfNulls<Array<String?>?>(stackSize)
+            }
+            var indexesForStack = shadowedNamespaces!![stackSize - 1]
+            if (indexesForStack == null) {
+                shadowedNamespaces!![stackSize - 1] = arrayOfNulls(searchIndex + 1)
+                indexesForStack = shadowedNamespaces!![stackSize - 1]
+            }
+            if (searchIndex > indexesForStack!!.size) {
+                val newIndexesForStack = arrayOfNulls<String>(searchIndex + 1)
+                System.arraycopy(indexesForStack, 0, newIndexesForStack, 0, searchIndex + 1)
+                shadowedNamespaces!![stackSize - 1] = newIndexesForStack
+                indexesForStack = shadowedNamespaces!![stackSize - 1]
+            }
+            indexesForStack!![searchIndex] = namespaceValues[searchIndex]
+        } else {
+            insertIndex = searchIndex.inv()
+        }
+        if (namespaceSize == namespaceKeys.size) {
+            val newNamespaceKeys = arrayOfNulls<String>(namespaceSize * 2)
+            System.arraycopy(namespaceKeys, 0, newNamespaceKeys, 0, insertIndex)
+            newNamespaceKeys[insertIndex] = key
+            System.arraycopy(namespaceKeys, insertIndex, newNamespaceKeys, insertIndex + 1, namespaceSize - insertIndex)
+            val newNamespaceValues = arrayOfNulls<String>(namespaceSize * 2)
+            System.arraycopy(namespaceValues, 0, newNamespaceValues, 0, insertIndex)
+            newNamespaceValues[insertIndex] = value
+            System.arraycopy(
+                namespaceValues,
+                insertIndex,
+                newNamespaceValues,
+                insertIndex + 1,
+                namespaceSize - insertIndex
+            )
+            val newNamespaceStackPositions = IntArray(namespaceSize * 2)
+            System.arraycopy(namespaceStackPositions, 0, newNamespaceStackPositions, 0, insertIndex)
+            newNamespaceStackPositions[insertIndex] = stackSize
+            System.arraycopy(
+                namespaceStackPositions,
+                insertIndex,
+                newNamespaceStackPositions,
+                insertIndex + 1,
+                namespaceSize - insertIndex
+            )
+            namespaceKeys = newNamespaceKeys
+            namespaceValues = newNamespaceValues
+            namespaceStackPositions = newNamespaceStackPositions
+        } else {
+            System.arraycopy(namespaceKeys, insertIndex, namespaceKeys, insertIndex + 1, namespaceSize - insertIndex)
+            namespaceKeys[insertIndex] = key
+            System.arraycopy(
+                namespaceValues,
+                insertIndex,
+                namespaceValues,
+                insertIndex + 1,
+                namespaceSize - insertIndex
+            )
+            namespaceValues[insertIndex] = value
+            System.arraycopy(
+                namespaceStackPositions,
+                insertIndex,
+                namespaceStackPositions,
+                insertIndex + 1,
+                namespaceSize - insertIndex
+            )
+            namespaceStackPositions[insertIndex] = stackSize
+        }
+        this.namespaceSize++
+    }
+
+    private fun namespaceValue(key: String): String? {
+        val index = Arrays.binarySearch(namespaceKeys, 0, namespaceSize, key)
+        return if (index >= 0) {
+            namespaceValues[index]
+        } else {
+            null
+        }
     }
 
     /**
@@ -514,6 +655,49 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         // Next we expect element attributes block
         pushStack(XmlScope.ELEMENT_ATTRIBUTE)
         return currentTagName
+    }
+
+    /**
+     * Reads the next attribute, and it's namespace if not null. Since declaring namespaces are
+     * attributes themselves, this method may return null if it is parsing a xmlns declaration. In
+     * that case, the attribute should be skipped and not given to the client.
+     */
+    private fun readNextAttribute(namespace: Namespace?): String? {
+        val i = source.indexOfElement(ATTRIBUTE_OR_NAMESPACE_END_TERMINAL)
+        val attrOrNs = if (i != -1L) buffer.readUtf8(i) else buffer.readUtf8()
+        fillBuffer(1)
+        val n = buffer[0].toInt()
+        return if (n == ':'.code) {
+            buffer.readByte() // ':'
+            if ("xmlns" == attrOrNs) {
+                val name = nextUnquotedValue()
+                pushStack(XmlScope.ELEMENT_ATTRIBUTE)
+                peeked = PEEKED_NONE
+                val value = nextValue()
+                insertNamespace(name, value)
+                null
+            } else {
+                if (namespace != null) {
+                    namespace.alias = attrOrNs
+                    namespace.namespace = namespaceValue(attrOrNs)
+                }
+                nextUnquotedValue()
+            }
+        } else {
+            if ("xmlns" == attrOrNs) {
+                pushStack(XmlScope.ELEMENT_ATTRIBUTE)
+                peeked = PEEKED_NONE
+                val value = nextValue()
+                defaultNamespaces[stackSize - 1] = value
+                null
+            } else {
+                if (namespace != null) {
+                    namespace.alias = null
+                    namespace.namespace = defaultNamespaces[stackSize - 1]
+                }
+                attrOrNs
+            }
+        }
     }
 
     /** Returns an unquoted value as a string.  */
@@ -716,6 +900,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     companion object {
+        private val ATTRIBUTE_OR_NAMESPACE_END_TERMINAL = ":= ".encodeUtf8()
         private val UNQUOTED_STRING_TERMINALS = " >/=\n".encodeUtf8()
         private val CDATA_CLOSE = "]]>".encodeUtf8()
         private val CDATA_OPEN = "<![CDATA[".encodeUtf8()
