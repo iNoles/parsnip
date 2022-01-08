@@ -40,6 +40,11 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     private val buffer: Buffer = source.buffer
     private var currentTagName: String? = null
 
+    // We have to eagerly parse the next attribute in order to skip xmlns declarations,
+    // therefore we should save what it was.
+    // private var lastAttribute: String? = null
+    private val tempNamespace = Namespace()
+
     init {
         stack[stackSize++] = XmlScope.EMPTY_DOCUMENT
     }
@@ -168,8 +173,8 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                             throw syntaxError("Missing closing '>' character in </" + pathNames[stackSize - 1])
                         }
                     } else {
-                        throw syntaxError("Expected a closing element tag </ ${pathNames[stackSize - 1]}>" +
-                                " but found </ $closingElementName >"
+                        throw syntaxError("Expected a closing element tag </${pathNames[stackSize - 1]}>" +
+                                " but found </$closingElementName>"
                         )
                     }
                 }
@@ -643,18 +648,47 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
      *
      * @return The name
      */
-    fun nextTagName(): String? {
+    @JvmOverloads
+    fun nextTagName(namespace: Namespace = tempNamespace): String? {
         val p = peekIfNone()
         if (p != PEEKED_ELEMENT_NAME) {
             throw syntaxError("Expected XML Tag Element name, but have " + peek())
         }
-        currentTagName = nextUnquotedValue()
+        val tag = nextTag(namespace)
+        currentTagName = tag
         peeked = PEEKED_NONE
-        pathNames[stackSize - 1] = currentTagName
+        pathNames[stackSize - 1] = if (namespace.alias == null) tag else namespace.alias + ":" + tag
 
         // Next we expect element attributes block
         pushStack(XmlScope.ELEMENT_ATTRIBUTE)
         return currentTagName
+    }
+
+    /**
+     * Returns the next tag and fills the given namespace.
+     */
+    private fun nextTag(namespace: Namespace): String {
+        // There may be space between the opening and the tag.
+        nextNonWhitespace(true)
+        val i = source.indexOfElement(TAG_OR_NAMESPACE_END_TERMINAL)
+        val tagOrNs = if (i != -1L) buffer.readUtf8(i) else buffer.readUtf8()
+        fillBuffer(1)
+        val n = buffer[0].toInt()
+        return if (n == ':'.code) {
+            buffer.readByte() // ':'
+            namespace.alias = tagOrNs
+            namespace.namespace = namespaceValue(tagOrNs)
+            readNextTagName()
+        } else {
+            namespace.alias = null
+            namespace.namespace = defaultNamespaces[stackSize - 1]
+            tagOrNs
+        }
+    }
+
+    private fun readNextTagName(): String {
+        val i = source.indexOfElement(TAG_START_TERMINALS)
+        return if (i != -1L) buffer.readUtf8(i) else buffer.readUtf8()
     }
 
     /**
@@ -670,7 +704,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         return if (n == ':'.code) {
             buffer.readByte() // ':'
             if ("xmlns" == attrOrNs) {
-                val name = nextUnquotedValue()
+                val name = readNextAttributeName()
                 pushStack(XmlScope.ELEMENT_ATTRIBUTE)
                 peeked = PEEKED_NONE
                 val value = nextValue()
@@ -681,7 +715,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                     namespace.alias = attrOrNs
                     namespace.namespace = namespaceValue(attrOrNs)
                 }
-                nextUnquotedValue()
+                readNextAttributeName()
             }
         } else {
             if ("xmlns" == attrOrNs) {
@@ -698,6 +732,11 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                 attrOrNs
             }
         }
+    }
+
+    private fun readNextAttributeName(): String {
+        val i = source.indexOfElement(ATTRIBUTE_END_TERMINAL)
+        return if (i != -1L) buffer.readUtf8(i) else buffer.readUtf8()
     }
 
     /** Returns an unquoted value as a string.  */
@@ -900,7 +939,10 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     }
 
     companion object {
+        private val TAG_START_TERMINALS = ">/ \n\t\r\u000c".encodeUtf8()
+        private val ATTRIBUTE_END_TERMINAL = "= ".encodeUtf8()
         private val ATTRIBUTE_OR_NAMESPACE_END_TERMINAL = ":= ".encodeUtf8()
+        private val TAG_OR_NAMESPACE_END_TERMINAL = ":>/ \n\t\r\u000c".encodeUtf8()
         private val UNQUOTED_STRING_TERMINALS = " >/=\n".encodeUtf8()
         private val CDATA_CLOSE = "]]>".encodeUtf8()
         private val CDATA_OPEN = "<![CDATA[".encodeUtf8()
