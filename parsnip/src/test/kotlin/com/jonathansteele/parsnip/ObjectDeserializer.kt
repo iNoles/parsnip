@@ -97,7 +97,7 @@ class ObjectDeserializer {
                 "<ns:StringObject string1=\"test2\"/>" +
                 "</NamespaceObject>"
         )
-        //Assert.assertEquals("value", namespaceObject.attribute)
+        Assert.assertEquals("value", namespaceObject.attribute)
         Assert.assertEquals(StringObject("test", null), namespaceObject.tag)
         Assert.assertEquals(listOf(StringObject("test1", null), StringObject("test2", null)), namespaceObject.item)
     }
