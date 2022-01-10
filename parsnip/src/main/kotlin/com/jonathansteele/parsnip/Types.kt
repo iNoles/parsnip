@@ -22,7 +22,7 @@ import java.util.*
 object Types {
     /**
      * Resolves the generated [XmlAdapter] fully qualified class name for a given [clazz]. This is the same lookup logic
-     * used by both the Moshi code generation as well as lookup for any XmlClass-annotated classes. This can be useful
+     * used by both the Parsnip code generation as well as lookup for any XmlClass-annotated classes. This can be useful
      * if generating your own XmlAdapters without using Parsnip's first party code gen.
      *
      * @param clazz the class to calculate a generated XmlAdapter name for.
