@@ -40,7 +40,7 @@ object Types {
     /**
      * Resolves the generated [XmlAdapter] fully qualified class name for a given [ ] `className`.
      * This is the same lookup logic used by both the Parsnip code generation as well as lookup for any
-     * xmlClass-annotated classes. This can be useful if generating your own XmlAdapters without using Moshi's
+     * xmlClass-annotated classes. This can be useful if generating your own XmlAdapters without using Parsnip's
      * first party code gen.
      *
      * @param className the fully qualified class to calculate a generated XmlAdapter name for.
