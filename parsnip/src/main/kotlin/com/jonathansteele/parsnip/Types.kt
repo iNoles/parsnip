@@ -16,10 +16,8 @@
 package com.jonathansteele.parsnip
 
 import com.jonathansteele.parsnip.annotations.XmlClass
-import com.jonathansteele.parsnip.annotations.XmlQualifier
 import java.lang.reflect.*
 import java.util.*
-import kotlin.collections.LinkedHashSet
 
 object Types {
     /**
