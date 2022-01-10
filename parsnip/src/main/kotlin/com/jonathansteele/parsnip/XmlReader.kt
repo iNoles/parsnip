@@ -16,6 +16,12 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
     private var pathNames = arrayOfNulls<String>(32)
     private var pathIndices = IntArray(32)
 
+    // We need to store all the attributes we come across for a given tag so that we can validate
+    // duplicates
+    // private var attributeNames = arrayOfNulls<String>(32)
+    // private var attributeNamespaces = arrayOfNulls<String>(32)
+    // private var attributeSize = 0
+
     // Array of namespace keys (think 'foo' in 'xmlns:foo="bar"') sorted for quick binary search.
     private var namespaceKeys = arrayOfNulls<String>(4)
 
@@ -164,7 +170,7 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
                     buffer.readByte() // consume /
 
                     // Check if it is the corresponding xml element name
-                    val closingElementName = nextUnquotedValue()
+                    val closingElementName = readNextTagName()
                     if (closingElementName == pathNames[stackSize - 1]) {
                         if (nextNonWhitespace(false) == '>'.code) {
                             buffer.readByte() // consume >
@@ -251,7 +257,46 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         if (p != PEEKED_ATTRIBUTE_NAME) {
             throw syntaxError("Expected xml element attribute name but was " + peek())
         }
-        val result = nextUnquotedValue()
+
+        /* var attribute: String?
+        if (lastAttribute != null) {
+            namespace.namespace = tempNamespace.namespace
+            namespace.alias = tempNamespace.alias
+            attribute = lastAttribute
+            lastAttribute = null
+        } else {
+            // We must skip any xmlns attributes
+            do {
+                attribute = readNextAttribute(namespace)
+            } while (attribute == null)
+        }
+        val attributeSize = attributeSize
+        for (i in 0 until attributeSize) {
+            val name = attributeNames[i]
+            if (attribute == name) {
+                val namespaceName = attributeNamespaces[i]
+                if (namespace.namespace == null && namespaceName == null) {
+                    throw XmlDataException("Duplicate attribute '$name' at path $path")
+                } else if (namespace.namespace != null) {
+                    if (namespace.namespace == namespaceName) {
+                        throw XmlDataException("Duplicate attribute '{$namespace}$name' at path $path")
+                    }
+                }
+            }
+        }
+        if (attributeSize == attributeNames.size) {
+            val newAttributeNames = arrayOfNulls<String>(attributeSize * 2)
+            System.arraycopy(attributeNames, 0, newAttributeNames, 0, attributeSize)
+            attributeNames = newAttributeNames
+            val newAttributeNamespaces = arrayOfNulls<String>(attributeSize * 2)
+            System.arraycopy(attributeNamespaces, 0, newAttributeNamespaces, 0, attributeSize)
+            attributeNamespaces = newAttributeNamespaces
+        }
+        attributeNames[attributeSize] = attribute
+        attributeNamespaces[attributeSize] = namespace.namespace
+        this.attributeSize++*/
+
+        val result = readNextAttributeName()
         peeked = PEEKED_NONE
         pathNames[stackSize - 1] = result
         return result
@@ -739,12 +784,6 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         return if (i != -1L) buffer.readUtf8(i) else buffer.readUtf8()
     }
 
-    /** Returns an unquoted value as a string.  */
-    private fun nextUnquotedValue(): String {
-        val i = source.indexOfElement(UNQUOTED_STRING_TERMINALS)
-        return if (i != -1L) buffer.readUtf8(i) else buffer.readUtf8()
-    }
-
     /**
      * Returns the string up to but not including `quote`, non-escaping any character escape
      * sequences encountered along the way. The opening quote should have already been read. This
@@ -943,7 +982,6 @@ class XmlReader internal constructor(private val source: BufferedSource) : Close
         private val ATTRIBUTE_END_TERMINAL = "= ".encodeUtf8()
         private val ATTRIBUTE_OR_NAMESPACE_END_TERMINAL = ":= ".encodeUtf8()
         private val TAG_OR_NAMESPACE_END_TERMINAL = ":>/ \n\t\r\u000c".encodeUtf8()
-        private val UNQUOTED_STRING_TERMINALS = " >/=\n".encodeUtf8()
         private val CDATA_CLOSE = "]]>".encodeUtf8()
         private val CDATA_OPEN = "<![CDATA[".encodeUtf8()
         private val DOCTYPE_OPEN = "<!DOCTYPE".encodeUtf8()
