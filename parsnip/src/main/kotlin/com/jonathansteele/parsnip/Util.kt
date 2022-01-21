@@ -169,6 +169,13 @@ fun Type.checkNotPrimitive() {
     return toString() + if (annotations.isEmpty()) " (with no annotations)" else " annotated $annotations"
 }*/
 
+internal inline fun <T : Any> checkNull(value: T?, lazyMessage: (T) -> Any) {
+    if (value != null) {
+        val message = lazyMessage(value)
+        throw IllegalStateException(message.toString())
+    }
+}
+
 internal class ParameterizedTypeImpl private constructor(
     private val ownerType: Type?,
     private val rawType: Type,

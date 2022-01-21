@@ -67,7 +67,7 @@ class Parsnip internal constructor(builder: Builder) {
             typeConverterFactories.add(typeConverter)
         }
 
-        fun add(adapter: Any?): Builder = add(AdapterMethodsFactory.get(adapter))
+        fun add(adapter: Any): Builder = add(AdapterMethodsFactory[adapter])
 
         fun build(): Parsnip = Parsnip(this)
     }
