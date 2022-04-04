@@ -9,7 +9,7 @@ import java.io.EOFException
 import java.io.IOException
 import java.util.*
 
-//TODO: Namespace Support
+//TODO: Reading Namespace Support
 class XmlReader internal constructor(private val source: BufferedSource) : Closeable {
     /** The input XML.  */
     private var peeked = PEEKED_NONE

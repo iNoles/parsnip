@@ -138,7 +138,7 @@ internal class AdapterMethodsFactory(
 
         /**
          * Returns an object that calls a `method` method on `adapter` in service of
-         * converting an object to JSON.
+         * converting an object to Xml.
          */
         private fun toAdapter(adapter: Any, method: Method): AdapterMethod {
             method.isAccessible = true
