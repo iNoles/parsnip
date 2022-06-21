@@ -11,5 +11,5 @@ dependencies {
 
     implementation("com.tickaroo.tikxml:annotation:0.8.13")
     implementation("com.tickaroo.tikxml:core:0.8.13")
-    annotationProcessor("com.tickaroo.tikxml:processor:0.8.13")
+    annotationProcessor("com.tickaroo.tikxml:processor:0.8.15")
 }
