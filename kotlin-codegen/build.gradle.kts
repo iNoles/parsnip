@@ -5,7 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":parsnip"))
-    api("com.squareup:kotlinpoet-metadata:1.11.0")
+    api("com.squareup:kotlinpoet-metadata:1.12.0")
 
     compileOnly("net.ltgt.gradle.incap:incap:0.3")
     kapt("net.ltgt.gradle.incap:incap-processor:0.3")

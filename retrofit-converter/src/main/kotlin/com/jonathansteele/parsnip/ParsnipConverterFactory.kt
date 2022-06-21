@@ -40,7 +40,7 @@ class ParsnipConverterFactory private constructor(private val parsnip: Parsnip) 
         retrofit: Retrofit
     ): Converter<*, RequestBody> {
         val adapter= parsnip.adapter<Any>(type)
-        return ParsnipRequestBodyConverter<Any>(adapter)
+        return ParsnipRequestBodyConverter(adapter)
     }
 
     companion object {
